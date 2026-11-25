@@ -42,3 +42,10 @@ Bump the number in `version.json` on every publish. index.html reads it uncached
 - Drafts and scheduled posts: Posts columns Status (draft or empty) and PublishAt. A scheduled post becomes visible when its time passes; no time trigger is used. Stage 6 still has to decide how the email for a scheduled post gets sent at that moment (a time trigger needs one more permission).
 - `dev/tools/server_test.js` runs the real Code.js against an in-memory Sheet. Copy src/Code.js beside it first (see its top lines). Run it after any server change.
 - Owner wish list for version 2 (not started): certifications with expiry reminders, onboarding checklist, class milestone badges from Arketa, open sub requests, birthdays and zodiac (opt-in), perks page.
+
+## Stage 6 (email): built, in TEST mode
+- Settings key EmailMode is off, test, or live. It was seeded as test, with TestEmail set to the owner's personal address. In test mode every email goes only to that address, marked [Test], one sample per action. The owner switches to live under Team, App settings. Do not switch it for them.
+- Emails: new post, real change, nudge, personal link. All go through sendMail_ in Code.js, the only caller of MailApp. Every send is logged in the EmailLog tab.
+- Scheduled posts: the email goes out the next time anyone opens the app after the time has passed (sendDue_ in boot). A time trigger would make it exact but needs one more permission; the owner has not decided.
+- `dev/tools/server_test_email.js` checks all of this against a pretend mail service.
+- Still to do: the three written guides from the FINISH section of the original prompt, then deactivate the Test Person row when the owner is done testing.

@@ -7,10 +7,10 @@ const log = []; const check = (n, ok, x) => log.push((ok ? 'PASS ' : 'FAIL ') + 
 function makeWorld() {
   const tables = {}; let uid = 0;
   const ctx = { console, JSON, Date, Math, Number, String, Object, Array, isNaN, RegExp,
-    Utilities: { getUuid: () => require("crypto").randomUUID(), formatDate: (d) => d.toISOString().slice(0, 10) },
+    Utilities: { getUuid: () => require("crypto").randomUUID(), formatDate: (d, tz, f) => f === 'EEE, MMM d' ? new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short', month: 'short', day: 'numeric' }).format(d) : new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d) },
     PropertiesService: { getScriptProperties: () => ({ getProperty: k => ({ SEED_VERSION: '99', SHEET_ID: 'x' }[k] || null), setProperty() {} }) },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
-    SpreadsheetApp: { flush() {} }, ContentService: {}, MailApp: {}, ScriptApp: {}, Logger: { log() {} } };
+    SpreadsheetApp: { flush() {} }, ContentService: {}, MailApp: { sendEmail() {}, getRemainingDailyQuota: () => 1500 }, ScriptApp: {}, Logger: { log() {} } };
   vm.createContext(ctx); vm.runInContext(code, ctx);
   // Swap the Sheet helpers for in-memory ones. Everything above them is the real code.
   const TABS = vm.runInContext('TABS', ctx);
