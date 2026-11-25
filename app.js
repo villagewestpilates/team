@@ -196,7 +196,7 @@
     return '<header class="hello">' +
       '<div class="hello-text"><div class="hello-small">' + greeting() + '</div>' +
       '<div class="hello-name">' + esc(me.firstName) + '</div></div>' +
-      '<div class="brand"><span class="wordmark">VILLAGE WEST</span>' +
+      '<div class="brand"><img class="wordmark-img" src="brand/wordmark.png" alt="Village West" width="132" height="11">' +
       (state.settings.beta ? '<span class="beta">Beta</span>' : '') + '</div>' +
     '</header>';
   }
