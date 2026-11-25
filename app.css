@@ -481,3 +481,19 @@ body { background: var(--bg); }
 .sub-title { margin-top: 40px; padding-top: 28px; border-top: 1px solid var(--line); font-size: 22px; }
 
 .wordmark-img { display: block; height: 11px; width: auto; }
+
+/* ---------- Home header: logo top and center, greeting below ---------- */
+.top { margin-bottom: 22px; }
+.top-brand { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 2px 0 26px; }
+.top-brand .wordmark-img { height: 13px; }
+.hello { margin-bottom: 0; gap: 14px; align-items: center; }
+.tod { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex: none; }
+.tod svg.ic { width: 24px; height: 24px; }
+.tod-morning { background: #FBE9E2; color: #C65B45; }
+.tod-afternoon { background: #F7EDD3; color: #A67A1C; }
+.tod-evening { background: #EFE5F6; color: #7B52B9; }
+.tod-night { background: #E3E8F6; color: #3F5FC0; }
+.stamp { flex: none; text-align: right; }
+.stamp-day { font-size: 15px; font-weight: 600; line-height: 1.3; }
+.stamp-time { font-size: 14px; color: var(--muted); line-height: 1.3; font-variant-numeric: tabular-nums; }
+@media (max-width: 359px) { .stamp-day { font-size: 14px; } .tod { width: 42px; height: 42px; } }
