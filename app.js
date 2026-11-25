@@ -20,7 +20,7 @@
     view: 'tab',            // 'tab' | 'post' | 'done'
     postId: '',             // open post
     flow: null,             // { total, done, justRead: [ids] } while reading through unread posts
-    canPost: false, people: [], defaultCategory: '', draft: null, photos: {},
+    canPost: false, people: [], defaultCategory: '', draft: null, photos: {}, readers: null, team: null, personForm: null, catForm: null,
     filter: 'all', search: '', lastSeen: lsGet('vwp.seen'), holdFor: '',
     loadedAt: 0
   };
@@ -86,6 +86,7 @@
     for (var i = 0; i < state.categories.length; i++) if (state.categories[i].id === id) return state.categories[i];
     return { id: '', name: 'Announcements', color: '#3F5FC0' };
   }
+  function activeCats() { return state.categories.filter(function (c) { return !c.archived; }); }
   function tint(hex) {
     var m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
     if (!m) return '#EEF1F8';
@@ -115,10 +116,23 @@
       return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || -newestFirst(a, b);
     });
   }
-  function preview(body) { return String(body).replace(/\s+/g, ' ').trim().slice(0, 220); }
+  function preview(body) { return String(body).replace(/\*\*/g, '').replace(/^\s*[-•*]\s+/gm, '').replace(/\s+/g, ' ').trim().slice(0, 220); }
   function linkify(text) {
     return esc(text).replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"])/g,
       '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  }
+  function inline(t) { return linkify(t).replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>'); }
+  /** Plain text with line breaks and links, plus **bold** and lines that start with "- " as bullets. */
+  function renderBody(text) {
+    var out = '', buf = [], list = [];
+    function flushText() { if (buf.join('').trim()) out += '<div class="para">' + inline(buf.join('\n').replace(/^\n+|\n+$/g, '')) + '</div>'; buf = []; }
+    function flushList() { if (list.length) out += '<ul>' + list.map(function (l) { return '<li>' + inline(l) + '</li>'; }).join('') + '</ul>'; list = []; }
+    String(text).split('\n').forEach(function (l) {
+      var m = /^\s*[-•*]\s+(.*)$/.exec(l);
+      if (m) { flushText(); list.push(m[1]); } else { flushList(); buf.push(l); }
+    });
+    flushText(); flushList();
+    return out;
   }
   function safeUrl(u) { return /^(https?:|sms:|tel:|mailto:)/i.test(u) ? u : '#'; }
 
@@ -203,9 +217,10 @@
   function unreadCard(p) {
     return '<article class="card post-card">' +
       '<div class="card-top">' + catTag(p) + statusPill(p) + '</div>' +
-      '<h3 class="card-title">' + esc(p.title) + '</h3>' +
+      '<div class="card-main"><div class="card-main-text"><h3 class="card-title">' + esc(p.title) + '</h3>' +
       extras(p) +
-      '<p class="preview">' + esc(preview(p.body)) + '</p>' +
+      '<p class="preview">' + esc(preview(p.body)) + '</p></div>' +
+      (p.thumb ? '<img class="thumb" src="' + esc(p.thumb) + '" alt="">' : '') + '</div>' +
       '<div class="meta">' + metaLine(p) + '</div>' +
       '<button class="btn btn-primary" data-open="' + esc(p.id) + '">Open and read' + icon('arrow-right') + '</button>' +
     '</article>';
@@ -284,7 +299,7 @@
 
   function chips() {
     var n = unreadQueue().length;
-    var all = [['all', 'All'], ['unread', 'Unread' + (n ? ' ' + n : '')]].concat(state.categories.map(function (c) { return [c.id, c.name, c.color]; }));
+    var all = [['all', 'All'], ['unread', 'Unread' + (n ? ' ' + n : '')]].concat(activeCats().map(function (c) { return [c.id, c.name, c.color]; }));
     return all.map(function (c) {
       var on = state.filter === c[0];
       return '<button class="chip' + (on ? ' on' : '') + '" data-filter="' + esc(c[0]) + '" aria-pressed="' + on + '">' +
@@ -340,9 +355,9 @@
       '<div class="card-top">' + catTag(p) + (unread || p.readAt ? statusPill(p) : '') + '</div>' +
       '<h1 class="post-title">' + esc(p.title) + '</h1>' +
       '<div class="meta">' + metaLine(p) + '</div>' + extras(p) +
-      (p.stats && p.needsRead ? '<div class="stats">' + icon('users') + p.stats.read + ' of ' + p.stats.total + ' read</div>' : '') +
+      (p.stats && p.needsRead ? '<button class="stats" data-readers="' + esc(p.id) + '">' + icon('users') + p.stats.read + ' of ' + p.stats.total + ' read' + icon('chevron-right') + '</button>' : '') +
       (p.photo ? '<button class="photo" data-photo="' + esc(p.id) + '" aria-label="See the photo full size" style="aspect-ratio:' + p.photo.w + '/' + p.photo.h + '"><span class="sk"></span></button>' : '') +
-      '<div class="post-body">' + linkify(p.body) + '</div>' +
+      '<div class="post-body">' + renderBody(p.body) + '</div>' +
       (links ? '<div class="links">' + links + '</div>' : '') +
     '</div>' + foot;
   }
@@ -382,10 +397,12 @@
       html = renderPost(p);
     } else if (state.view === 'compose' && state.draft) {
       html = renderCompose();
+    } else if (state.view === 'readers') {
+      html = renderReaders();
     } else if (state.view === 'done') {
       html = renderDone();
     } else {
-      html = state.tab === 'home' ? renderHome() : state.tab === 'bulletins' ? renderBulletins() : renderSoon();
+      html = state.tab === 'home' ? renderHome() : state.tab === 'bulletins' ? renderBulletins() : state.tab === 'team' && state.me.role === 'admin' ? renderTeam() : renderSoon();
       if (state.canPost && (state.tab === 'home' || state.tab === 'bulletins')) {
         html += '<button class="fab" data-compose="new">' + icon('plus') + 'New post</button>';
       }
@@ -396,7 +413,7 @@
     if (anim) { veil.classList.remove('go'); void veil.offsetWidth; veil.classList.add('go'); }
     var held = document.querySelector('#markread[data-hold]');
     if (held) setTimeout(function () { held.disabled = false; held.classList.remove('holding'); }, 3000);
-    tabbar.hidden = state.view === 'post' || state.view === 'compose';
+    tabbar.hidden = state.view === 'post' || state.view === 'compose' || state.view === 'readers';
     if (state.view === 'post') loadPhoto(state.postId);
     if (!tabbar.hidden) renderTabbar();
   }
@@ -424,6 +441,7 @@
 
   function goTab(tab, push) {
     state.view = 'tab'; state.tab = tab; state.flow = null;
+    if (tab === 'team') state.team = null;
     if (push !== false) pushRoute('#/' + tab); else replaceRoute('#/' + tab);
     render('fade');
     window.scrollTo(0, 0);
@@ -546,6 +564,10 @@
             out = { data: c.toDataURL('image/jpeg', tries[i][1]), w: w, h: h };
             if (out.data.length < 240000) break;
           }
+          var side = Math.min(img.naturalWidth, img.naturalHeight), tc = document.createElement('canvas');
+          tc.width = tc.height = 200;
+          tc.getContext('2d').drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, 200, 200);
+          out.thumb = tc.toDataURL('image/jpeg', 0.55);
           URL.revokeObjectURL(url);
           resolve(out);
         } catch (err) { reject(err); }
@@ -562,7 +584,7 @@
     return { id: '', title: '', body: '', categoryId: state.defaultCategory || (state.categories[0] || {}).id || '',
       pinned: false, needsRead: true, readBy: '', audience: 'everyone', audienceIds: [], buttonText: '',
       links: [{ label: '', url: '' }, { label: '', url: '' }], eventDate: '', skipEmail: false,
-      photo: null, hasPhoto: false, removePhoto: false, more: false, dirty: false };
+      photo: null, hasPhoto: false, removePhoto: false, more: false, dirty: false, authorId: state.me.id };
   }
   function saveDraft() {
     var d = state.draft;
@@ -580,9 +602,9 @@
       if (!p || !p.canEdit) return;
       Object.assign(d, { id: p.id, title: p.title, body: p.body, categoryId: p.categoryId, pinned: p.pinned,
         needsRead: p.needsRead, readBy: p.readBy, audience: p.audience || 'everyone', audienceIds: (p.audienceIds || []).slice(),
-        buttonText: p.buttonText, eventDate: p.eventDate, skipEmail: !!p.skipEmail, hasPhoto: !!p.photo });
+        buttonText: p.buttonText, eventDate: p.eventDate, skipEmail: !!p.skipEmail, hasPhoto: !!p.photo, authorId: p.authorId || state.me.id });
       (p.links || []).forEach(function (l, i) { if (i < 2) d.links[i] = { label: l.label, url: l.url }; });
-      d.more = !!(d.buttonText || d.links[0].url || d.pinned || d.skipEmail);
+      d.more = !!(d.buttonText || d.links[0].url || d.pinned || d.skipEmail || d.authorId !== state.me.id);
     } else {
       try { var saved = JSON.parse(lsGet(DRAFT_KEY) || 'null'); if (saved && (saved.title || saved.body)) { d = Object.assign(d, saved); d.restored = true; } } catch (e) {}
     }
@@ -637,9 +659,18 @@
     return '<button class="photo-pick" data-addphoto="1">' + icon('plus') + '<span>Add a photo</span><small>Optional. One per post.</small></button>';
   }
 
+  function postAs(d) {
+    var who = state.people.filter(function (x) { return x.role === 'admin' || x.role === 'poster'; });
+    if (state.me.role !== 'admin' || who.length < 2) return '';
+    return '<div class="lbl">Posted by <span class="opt">shows as their post</span></div><div class="chips wrap">' + who.map(function (x) {
+      var on = d.authorId === x.id;
+      return '<button class="chip' + (on ? ' on' : '') + '" data-author="' + esc(x.id) + '" aria-pressed="' + on + '">' + esc(x.id === state.me.id ? 'Me' : x.firstName) + '</button>';
+    }).join('') + '</div>';
+  }
+
   function renderCompose() {
     var d = state.draft, editing = !!d.id;
-    var cats = state.categories.map(function (c) {
+    var cats = activeCats().map(function (c) {
       var on = d.categoryId === c.id;
       return '<button class="chip' + (on ? ' on' : '') + '" data-cat="' + esc(c.id) + '" aria-pressed="' + on + '"><span class="dot" style="background:' + esc(c.color) + '"></span>' + esc(c.name) + '</button>';
     }).join('');
@@ -664,7 +695,8 @@
       '<label class="lbl" for="f-title">Title</label>' +
       '<textarea class="input title-input" id="f-title" data-f="title" rows="1" maxlength="140" placeholder="What is this about?">' + esc(d.title) + '</textarea>' +
 
-      '<label class="lbl" for="f-body">Post</label>' +
+      '<div class="lbl-row"><label class="lbl" for="f-body">Post</label><div class="fmt">' +
+        '<button data-fmt="bold" aria-label="Bold"><b>B</b> Bold</button><button data-fmt="list" aria-label="Bullet list">' + icon('list') + 'List</button></div></div>' +
       '<textarea class="input body-input" id="f-body" data-f="body" rows="7" placeholder="Write it the way you\'d say it. Links you paste become tappable.">' + esc(d.body) + '</textarea>' +
 
       '<div class="lbl">Photo</div><div id="photo-field">' + photoField(d) + '</div>' +
@@ -683,7 +715,7 @@
         '<div class="group">' + toggle('pinned', d.pinned, 'Pin to the top', 'Stays first in Bulletins until you unpin it.') +
           toggle('skipEmail', d.skipEmail, 'Skip the email for this post', 'People will only see it when they open the app.') + '</div>' +
         (d.needsRead ? '<label class="lbl" for="f-btn">Wording for the Mark as read button <span class="opt">optional</span></label><input class="input" id="f-btn" data-f="buttonText" maxlength="40" placeholder="Mark as read" value="' + esc(d.buttonText) + '">' : '') +
-        '<div class="lbl">Link buttons <span class="opt">up to two</span></div>' + linkRows +
+        '<div class="lbl">Link buttons <span class="opt">up to two</span></div>' + linkRows + postAs(d) +
         (editing ? '<button class="danger-link" data-archive="1">Remove this post</button>' : '') +
       '</div>' : '') +
     '</div>' +
@@ -734,15 +766,17 @@
       return;
     }
     var sh = e.target.closest('[data-sheet]');
-    if (sh) return sheetAction(sh.getAttribute('data-sheet'));
+    if (sh) return sheetAction(sh.getAttribute('data-sheet'), sh.getAttribute('data-arg') || '');
     if (e.target.classList && e.target.classList.contains('sheet-wrap')) return closeSheet();
-    var t = e.target.closest('[data-compose],[data-edit],[data-cat],[data-aud],[data-person],[data-toggle],[data-more],[data-addphoto],[data-rmphoto],[data-submit],[data-archive]');
+    if (stage4Click(e)) return;
+    var t = e.target.closest('[data-fmt],[data-author],[data-compose],[data-edit],[data-cat],[data-aud],[data-person],[data-toggle],[data-more],[data-addphoto],[data-rmphoto],[data-submit],[data-archive]');
     if (!t) return;
     if (t.hasAttribute('data-compose')) return openCompose('');
     if (t.hasAttribute('data-edit')) return openCompose(t.getAttribute('data-edit'));
     var d = state.draft;
     if (!d) return;
     if (t.hasAttribute('data-addphoto')) return document.getElementById('photo-input').click();
+    if (t.hasAttribute('data-fmt')) return formatBody(t.getAttribute('data-fmt'));
     if (t.hasAttribute('data-submit')) return submitPost();
     if (t.hasAttribute('data-archive')) {
       return sheet('<h2>Remove this post?</h2><p>It disappears from the app for everyone. The record stays in your Sheet.</p>' +
@@ -751,6 +785,7 @@
     d.dirty = true;
     if (t.hasAttribute('data-rmphoto')) { d.photo = null; if (d.hasPhoto) d.removePhoto = true; document.getElementById('photo-field').innerHTML = photoField(d); return; }
     if (t.hasAttribute('data-cat')) d.categoryId = t.getAttribute('data-cat');
+    else if (t.hasAttribute('data-author')) d.authorId = t.getAttribute('data-author');
     else if (t.hasAttribute('data-aud')) d.audience = t.getAttribute('data-aud');
     else if (t.hasAttribute('data-person')) {
       var id = t.getAttribute('data-person'), i = d.audienceIds.indexOf(id);
@@ -772,8 +807,9 @@
     document.body.appendChild(w);
   }
   function closeSheet() { var w = document.querySelector('.sheet-wrap'); if (w) w.remove(); }
-  function sheetAction(what) {
+  function sheetAction(what, arg) {
     if (what === 'close') return closeSheet();
+    if (teamSheetAction(what, arg)) return;
     if (what === 'leave') { closeSheet(); return closeCompose(); }
     if (what === 'post') return sendPost('');
     if (what === 'small' || what === 'real') return sendPost(what);
@@ -816,15 +852,15 @@
     var box = document.querySelector('.sheet');
     if (box) box.innerHTML = '<div class="sheet-busy"><div class="sk" style="width:48px;height:48px;border-radius:50%"></div><p>' + (d.id ? 'Saving' : 'Posting') + (d.photo ? ' and sending the photo' : '') + '</p></div>';
     api('savePost', {
-      change: change || '', removePhoto: !!d.removePhoto, photo: d.photo,
-      post: { id: d.id, title: d.title, body: d.body, categoryId: d.categoryId, pinned: d.pinned, needsRead: d.needsRead,
+      change: change || '', removePhoto: !!d.removePhoto, photo: d.photo ? { data: d.photo.data, w: d.photo.w, h: d.photo.h } : null, thumb: d.photo ? d.photo.thumb : '',
+      post: { id: d.id, authorId: d.authorId, title: d.title, body: d.body, categoryId: d.categoryId, pinned: d.pinned, needsRead: d.needsRead,
         readBy: d.readBy, audience: d.audience, audienceIds: d.audienceIds, buttonText: d.buttonText,
         links: d.links, eventDate: isPromo(d.categoryId) ? d.eventDate : '', skipEmail: d.skipEmail }
     }, 75000).then(function (res) {
       sending = false;
       closeSheet();
       if (!res || !res.ok) { toast((res && res.message) || 'That didn\'t save. Try again.'); return; }
-      state.posts = res.posts;
+      state.posts = res.posts || state.posts;
       if (d.photo) state.photos[res.postId] = d.photo.data; else if (d.removePhoto) delete state.photos[res.postId];
       if (!d.id) lsSet(DRAFT_KEY, '');
       state.draft = null; state.flow = null;
@@ -845,10 +881,279 @@
     api('archivePost', { postId: d.id }).then(function (res) {
       sending = false; closeSheet();
       if (!res || !res.ok) return toast((res && res.message) || 'That didn\'t work. Try again.');
-      state.posts = res.posts; state.draft = null; saveLocalSnapshot();
+      state.posts = res.posts || state.posts; state.draft = null; saveLocalSnapshot();
       goTab('bulletins', false);
       toast('Post removed');
     }).catch(function () { sending = false; closeSheet(); toast('That didn\'t work. Check your connection and try again.'); });
+  }
+
+
+  /* ---------- Bold and bullet buttons ---------- */
+
+  function formatBody(kind) {
+    var ta = document.getElementById('f-body'), d = state.draft;
+    if (!ta || !d) return;
+    var v = ta.value, a = ta.selectionStart || 0, b = ta.selectionEnd || 0, selA, selB;
+    if (kind === 'bold') {
+      var inner = v.slice(a, b) || 'bold text';
+      v = v.slice(0, a) + '**' + inner + '**' + v.slice(b);
+      selA = a + 2; selB = a + 2 + inner.length;
+    } else {
+      var start = v.lastIndexOf('\n', a - 1) + 1, end = v.indexOf('\n', b); if (end === -1) end = v.length;
+      var block = v.slice(start, end).split('\n').map(function (l) { return /^\s*[-•*]\s+/.test(l) ? l : '- ' + l; }).join('\n');
+      v = v.slice(0, start) + block + v.slice(end);
+      selA = selB = start + block.length;
+    }
+    ta.value = v; d.body = v; d.dirty = true; saveDraft();
+    ta.focus(); try { ta.setSelectionRange(selA, selB); } catch (e) {}
+  }
+
+  /* ---------- Who has read ---------- */
+
+  function whenText(iso) {
+    if (!iso) return '';
+    var d = asDate(iso), time = fmt(iso, { hour: 'numeric', minute: '2-digit' });
+    return dayKey(d) === dayKey(new Date()) ? 'today at ' + time : fullDate(iso);
+  }
+
+  function loadReaders(id) {
+    state.readers = null;
+    api('readers', { postId: id }).then(function (res) {
+      if (state.postId !== id) return;
+      if (res && res.ok) { state.readers = res; var p = byId(id); if (p && p.stats) { p.stats.read = res.groups.read.length; p.stats.total = res.groups.read.length + res.groups.opened.length + res.groups.notOpened.length; } }
+      else state.readers = { postId: id, error: (res && res.message) || 'That didn\'t load.' };
+      if (state.view === 'readers') render();
+    }).catch(function () { state.readers = { postId: id, error: 'Can\'t connect right now.' }; if (state.view === 'readers') render(); });
+  }
+  function openReaders(id) {
+    state.view = 'readers'; state.postId = id;
+    pushRoute('#/readers/' + id);
+    loadReaders(id);
+    render('fade'); window.scrollTo(0, 0);
+  }
+
+  function renderReaders() {
+    var p = byId(state.postId), r = state.readers;
+    var top = '<div class="screen post-screen"><div class="post-top"><button class="back" data-back="1" aria-label="Back">' + icon('chevron-left') + '</button>' +
+      '<div class="compose-head">Who has read</div><span class="back-spacer"></span></div>' +
+      '<p class="readers-title">' + esc(p ? p.title : '') + '</p>';
+    if (!r) return top + '<div class="sk" style="height:86px;border-radius:20px;margin-top:16px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:26px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:10px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:10px"></div></div>';
+    if (r.error) return top + '<div class="empty"><div class="bubble sm coral">' + icon('wifi-off') + '</div><div class="calm-title">' + esc(r.error) + '</div><button class="btn btn-outline sm" data-readers="' + esc(state.postId) + '" data-reload="1">Try again</button></div></div>';
+    var g = r.groups, total = g.read.length + g.opened.length + g.notOpened.length, left = g.opened.length + g.notOpened.length;
+    var pct = total ? Math.round(g.read.length / total * 100) : 0;
+    function rows(list, kind) {
+      return '<div class="rows-list">' + list.map(function (x) {
+        var sub = kind === 'read' ? 'Read ' + whenText(x.at)
+          : kind === 'opened' ? 'Opened ' + whenText(x.at)
+          : (x.lastVisit ? 'Last in the app ' + whenText(x.lastVisit) : 'Hasn\'t opened the app yet');
+        return '<div class="person-row"><span class="person-row-text"><span class="person-name">' + esc(x.name) + '</span><span class="person-sub">' + esc(sub) + '</span></span>' +
+          (kind === 'read' ? '<span class="row-read">' + icon('check') + '</span>' : '<button class="mini-btn" data-nudge="' + esc(x.id) + '">Nudge</button>') + '</div>';
+      }).join('') + '</div>';
+    }
+    function section(label, list, kind) { return list.length ? '<h2 class="section-label">' + label + ' <span class="n">' + list.length + '</span></h2>' + rows(list, kind) : ''; }
+    return top +
+      '<div class="tally"><div class="tally-top"><b>' + g.read.length + ' of ' + total + ' read</b><span>' + (left ? left + ' to go' : 'Everyone has read it') + '</span></div>' +
+      '<div class="bar"><span style="width:' + pct + '%"></span></div></div>' +
+      (left ? '<button class="btn btn-outline" data-nudge="all" style="margin-top:14px">' + icon('mail') + 'Nudge all ' + left + '</button>' : '') +
+      (total ? '' : '<p class="muted" style="margin-top:16px">Nobody is in this post\'s audience right now.</p>') +
+      section('Read', g.read, 'read') + section('Opened but not marked', g.opened, 'opened') + section('Not opened', g.notOpened, 'not') +
+      '<p class="fine">The full record is in your Sheet, in the Reads and Views tabs.</p></div>';
+  }
+
+  function nudge(who) {
+    var r = state.readers; if (!r || !r.groups) return;
+    var ids = who === 'all' ? r.groups.opened.concat(r.groups.notOpened).map(function (x) { return x.id; }) : [who];
+    api('nudge', { postId: state.postId, ids: ids }).then(function (res) {
+      toast(res && res.ok ? (ids.length === 1 ? 'Nudge sent' : 'Nudges sent to ' + (res.sent || ids.length)) : (res && res.message) || 'That didn\'t send.');
+    }).catch(function () { toast('That didn\'t send. Check your connection.'); });
+  }
+
+  /* ---------- Team screen (admins) ---------- */
+
+  var ROLE_WORDS = { admin: 'Admin', poster: 'Poster', member: 'Team member' };
+  var SWATCHES = ['#3F5FC0', '#7B52B9', '#4E8A6B', '#B8892B', '#C9432F', '#2E8C9A', '#C25B8E', '#5A6470'];
+
+  function loadTeam() {
+    api('team').then(function (res) {
+      if (res && res.ok) applyTeam(res); else state.team = { error: (res && res.message) || 'That didn\'t load.' };
+      if (state.view === 'tab' && state.tab === 'team') render();
+    }).catch(function () { state.team = { error: 'Can\'t connect right now.' }; if (state.view === 'tab' && state.tab === 'team') render(); });
+  }
+  function applyTeam(res) {
+    state.team = res;
+    state.settings = res.settings || state.settings;
+    state.categories = res.categories || state.categories;
+    if (res.newK) { // my own link changed: switch to it so I stay signed in
+      state.k = res.newK; lsSet(STORE_KEY, res.newK);
+      try { history.replaceState(history.state, '', location.pathname + '?k=' + res.newK + location.hash); } catch (e) {}
+    }
+    saveLocalSnapshot();
+  }
+  function person(id) { return ((state.team && state.team.team) || []).filter(function (x) { return x.id === id; })[0]; }
+  function linkFor(x) { return location.origin + location.pathname + '?k=' + x.token; }
+
+  function renderTeam() {
+    var t = state.team;
+    var head = '<div class="screen"><h1 class="page-title">Team</h1>';
+    if (!t) { loadTeam(); return head + '<div class="sk" style="height:56px;border-radius:16px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:26px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:10px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:10px"></div></div>'; }
+    if (t.error) return head + '<div class="empty"><div class="bubble sm coral">' + icon('wifi-off') + '</div><div class="calm-title">' + esc(t.error) + '</div><button class="btn btn-outline sm" data-teamreload="1">Try again</button></div></div>';
+    function row(x) {
+      var tags = (x.role !== 'member' ? '<span class="badge">' + ROLE_WORDS[x.role] + '</span>' : '') + (x.apprentice ? '<span class="badge soft">Apprentice</span>' : '');
+      return '<button class="person-row tap" data-person-open="' + esc(x.id) + '"><span class="person-row-text"><span class="person-name">' + esc(x.name) + tags + '</span>' +
+        '<span class="person-sub">' + (x.deactivated ? 'Deactivated. Link is off.' : x.lastVisit ? 'Last in the app ' + esc(whenText(x.lastVisit)) : 'Hasn\'t opened the app yet') + '</span></span>' + icon('chevron-right') + '</button>';
+    }
+    var on = t.team.filter(function (x) { return !x.deactivated; }), off = t.team.filter(function (x) { return x.deactivated; });
+    var cats = t.categories.filter(function (c) { return !c.archived; }).map(function (c) {
+      return '<button class="person-row tap" data-cat-open="' + esc(c.id) + '"><span class="dot" style="background:' + esc(c.color) + '"></span><span class="person-row-text"><span class="person-name">' + esc(c.name) + '</span></span>' + icon('pencil') + '</button>';
+    }).join('');
+    return head +
+      '<button class="btn btn-primary" data-person-add="1">' + icon('plus') + 'Add team member</button>' +
+      '<h2 class="section-label">On the team <span class="n">' + on.length + '</span></h2><div class="rows-list">' + on.map(row).join('') + '</div>' +
+      (off.length ? '<h2 class="section-label">Deactivated <span class="n">' + off.length + '</span></h2><div class="rows-list">' + off.map(row).join('') + '</div>' : '') +
+      '<h2 class="section-label">App settings</h2>' +
+      '<div class="group" style="margin-top:0">' + toggle('beta', state.settings.beta, 'Show the Beta tag', 'The small tag beside VILLAGE WEST on Home.').replace('data-toggle="beta"', 'data-setting="Beta"') + '</div>' +
+      '<h2 class="section-label">Categories</h2><div class="rows-list">' + cats + '</div>' +
+      '<button class="link-btn" data-cat-open="">' + icon('plus') + 'Add a category</button>' +
+    '</div>';
+  }
+
+  function personSheet(id, note) {
+    var x = person(id); if (!x) return;
+    var me = x.id === state.me.id, link = linkFor(x);
+    sheet('<h2>' + esc(x.name) + '</h2><p>' + esc(x.email) + '</p>' +
+      '<div class="sum"><span>Role</span><b>' + ROLE_WORDS[x.role] + (x.apprentice ? ', Apprentice' : '') + '</b></div>' +
+      '<div class="sum"><span>Last in the app</span><b>' + (x.lastVisit ? esc(whenText(x.lastVisit)) : 'Not yet') + '</b></div>' +
+      (x.deactivated
+        ? '<p class="note">Deactivated. Their link is off and their read history is kept.</p><button class="btn btn-primary" data-sheet="reactivate" data-arg="' + esc(x.id) + '">Reactivate</button>'
+        : (note ? '<p class="note">' + esc(note) + '</p>' : '') +
+          '<div class="linkbox">' + esc(link.replace(/^https?:\/\//, '')) + '</div>' +
+          '<button class="btn btn-primary" data-sheet="copy" data-arg="' + esc(x.id) + '">' + icon('copy') + 'Copy link</button>' +
+          '<button class="btn btn-outline" data-sheet="emaillink" data-arg="' + esc(x.id) + '">' + icon('mail') + 'Email it</button>' +
+          '<div class="sheet-links"><button data-sheet="editperson" data-arg="' + esc(x.id) + '">Edit details</button><button data-sheet="asknewlink" data-arg="' + esc(x.id) + '">New link</button>' +
+          (me ? '' : '<button class="red" data-sheet="askdeactivate" data-arg="' + esc(x.id) + '">Deactivate</button>') + '</div>') +
+      '<button class="btn btn-ghost" data-sheet="close">Done</button>');
+  }
+
+  function personForm(id) {
+    var x = id ? person(id) : null;
+    state.personForm = { id: id || '', role: x ? x.role : 'member', apprentice: x ? x.apprentice : false };
+    var f = state.personForm;
+    sheet('<h2>' + (x ? 'Edit details' : 'Add team member') + '</h2>' +
+      '<label class="lbl" for="pf-name" style="margin-top:6px">Name</label><input class="input" id="pf-name" autocomplete="off" placeholder="First and last name" value="' + esc(x ? x.name : '') + '">' +
+      '<label class="lbl" for="pf-email">Email</label><input class="input" id="pf-email" type="email" inputmode="email" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="name@example.com" value="' + esc(x ? x.email : '') + '">' +
+      '<div class="lbl">Role</div><div class="seg-group" id="pf-role">' + ['member', 'poster', 'admin'].map(function (r) {
+        return '<button class="seg-btn' + (f.role === r ? ' on' : '') + '" data-prole="' + r + '">' + ROLE_WORDS[r] + '</button>'; }).join('') + '</div>' +
+      '<p class="fine" id="pf-rolehint" style="margin-top:8px">' + roleHint(f.role) + '</p>' +
+      '<div class="group" style="margin-top:14px"><button class="switch-row" role="switch" aria-checked="' + f.apprentice + '" data-papp="1"><span class="switch-text"><span class="switch-label">In the Apprentices group</span></span><span class="switch' + (f.apprentice ? ' on' : '') + '"><span></span></span></button></div>' +
+      '<button class="btn btn-primary" data-sheet="saveperson" style="margin-top:14px">' + (x ? 'Save' : 'Add and create their link') + '</button><button class="btn btn-ghost" data-sheet="' + (x ? 'backtoperson' : 'close') + '" data-arg="' + esc(id || '') + '">Cancel</button>');
+  }
+  function roleHint(r) {
+    return r === 'admin' ? 'Admins can do everything, including this Team screen.' : r === 'poster' ? 'Posters can write posts and see who read their own.' : 'Team members read posts and mark them as read.';
+  }
+
+  function catForm(id) {
+    var c = id ? cat(id) : null;
+    state.catForm = { id: id || '', color: c ? c.color : SWATCHES[5] };
+    sheet('<h2>' + (c ? 'Edit category' : 'Add a category') + '</h2>' +
+      '<label class="lbl" for="cf-name" style="margin-top:6px">Name</label><input class="input" id="cf-name" maxlength="28" autocomplete="off" value="' + esc(c ? c.name : '') + '">' +
+      '<div class="lbl">Color</div><div class="swatches" id="cf-colors">' + SWATCHES.concat(c && SWATCHES.indexOf(c.color) === -1 ? [c.color] : []).map(function (col) {
+        return '<button class="swatch' + (state.catForm.color === col ? ' on' : '') + '" data-swatch="' + col + '" style="background:' + col + '" aria-label="Color ' + col + '">' + icon('check') + '</button>'; }).join('') + '</div>' +
+      '<button class="btn btn-primary" data-sheet="savecat" style="margin-top:14px">Save</button>' +
+      (c ? '<div class="sheet-links"><button class="red" data-sheet="retirecat" data-arg="' + esc(id) + '">Retire this category</button></div>' : '') +
+      '<button class="btn btn-ghost" data-sheet="close">Cancel</button>');
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+    return new Promise(function (resolve, reject) {
+      var ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy') ? resolve() : reject(); } catch (e) { reject(e); } finally { ta.remove(); }
+    });
+  }
+
+  var teamBusy = false;
+  function teamCall(action, data, then) {
+    if (teamBusy) return; teamBusy = true;
+    api(action, data).then(function (res) {
+      teamBusy = false;
+      if (!res || !res.ok) return toast((res && res.message) || 'That didn\'t work. Try again.');
+      applyTeam(res);
+      if (state.view === 'tab' && state.tab === 'team') { var y = window.scrollY; render(); window.scrollTo(0, y); }
+      then(res);
+      refresh(); // keeps the people list for posting in step
+    }).catch(function () { teamBusy = false; toast('That didn\'t work. Check your connection and try again.'); });
+  }
+
+  function teamSheetAction(what, arg) {
+    var x = arg ? person(arg) : null, first = x ? x.firstName : '';
+    if (what === 'copy') { copyText(linkFor(x)).then(function () { toast('Link copied. Paste it into a text or email to ' + first + '.'); }, function () { toast('Couldn\'t copy. Press and hold the link to copy it.'); }); return true; }
+    if (what === 'emaillink') { api('emailLink', { id: arg }).then(function (res) { toast(res && res.ok ? 'Link emailed to ' + first : (res && res.message) || 'That didn\'t send.'); }).catch(function () { toast('That didn\'t send.'); }); return true; }
+    if (what === 'editperson') { personForm(arg); return true; }
+    if (what === 'backtoperson') { personSheet(arg); return true; }
+    if (what === 'asknewlink') {
+      sheet('<h2>Give ' + esc(first) + ' a new link?</h2><p>' + (arg === state.me.id ? 'This is your own link. This phone will switch to the new one right away. Your other devices and your home screen icon will need the new link.' : 'Their current link stops working right away. You\'ll need to send them the new one.') + '</p>' +
+        '<button class="btn btn-primary" data-sheet="newlink" data-arg="' + esc(arg) + '">Make a new link</button><button class="btn btn-ghost" data-sheet="backtoperson" data-arg="' + esc(arg) + '">Cancel</button>');
+      return true;
+    }
+    if (what === 'newlink') { teamCall('newLink', { id: arg }, function () { personSheet(arg, 'New link is ready. The old one no longer works.'); }); return true; }
+    if (what === 'askdeactivate') {
+      sheet('<h2>Deactivate ' + esc(first) + '?</h2><p>Their link stops working and they come off the read counts. Their read history stays, and you can reactivate them later.</p>' +
+        '<button class="btn btn-danger" data-sheet="deactivate" data-arg="' + esc(arg) + '">Deactivate</button><button class="btn btn-ghost" data-sheet="backtoperson" data-arg="' + esc(arg) + '">Cancel</button>');
+      return true;
+    }
+    if (what === 'deactivate') { teamCall('setActive', { id: arg, active: false }, function () { closeSheet(); toast(first + ' is deactivated'); }); return true; }
+    if (what === 'reactivate') { teamCall('setActive', { id: arg, active: true }, function () { personSheet(arg, 'Reactivated. Their link works again.'); }); return true; }
+    if (what === 'saveperson') {
+      var f = state.personForm, name = document.getElementById('pf-name').value, email = document.getElementById('pf-email').value;
+      if (name.trim().length < 2) { toast('Add their name'); return true; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { toast('That email doesn\'t look right'); return true; }
+      teamCall('savePerson', { person: { id: f.id, name: name, email: email, role: f.role, apprentice: f.apprentice } }, function (res) {
+        personSheet(res.personId, res.added ? 'Added. Copy their link and send it to them.' : 'Saved.');
+      });
+      return true;
+    }
+    if (what === 'savecat') {
+      var cf = state.catForm, cname = document.getElementById('cf-name').value;
+      if (!cname.trim()) { toast('Give the category a name'); return true; }
+      teamCall('saveCategory', { category: { id: cf.id, name: cname, color: cf.color } }, function () { closeSheet(); toast('Category saved'); });
+      return true;
+    }
+    if (what === 'retirecat') {
+      var c = cat(arg);
+      teamCall('saveCategory', { category: { id: arg, name: c.name, color: c.color, archived: true } }, function () { closeSheet(); toast('Category retired. Old posts keep it.'); });
+      return true;
+    }
+    return false;
+  }
+
+  function stage4Click(e) {
+    var t = e.target.closest('[data-readers],[data-nudge],[data-person-open],[data-person-add],[data-cat-open],[data-setting],[data-teamreload],[data-prole],[data-papp],[data-swatch]');
+    if (!t) return false;
+    if (t.hasAttribute('data-readers')) { if (t.hasAttribute('data-reload')) { loadReaders(state.postId); render(); } else openReaders(t.getAttribute('data-readers')); }
+    else if (t.hasAttribute('data-nudge')) nudge(t.getAttribute('data-nudge'));
+    else if (t.hasAttribute('data-person-open')) personSheet(t.getAttribute('data-person-open'));
+    else if (t.hasAttribute('data-person-add')) personForm('');
+    else if (t.hasAttribute('data-cat-open')) catForm(t.getAttribute('data-cat-open'));
+    else if (t.hasAttribute('data-teamreload')) { state.team = null; render(); }
+    else if (t.hasAttribute('data-setting')) {
+      var val = !state.settings.beta; state.settings.beta = val; render();
+      teamCall('saveSetting', { key: 'Beta', value: val }, function () { toast(val ? 'Beta tag is on' : 'Beta tag is off'); });
+    }
+    else if (t.hasAttribute('data-prole')) {
+      state.personForm.role = t.getAttribute('data-prole');
+      [].forEach.call(document.querySelectorAll('#pf-role .seg-btn'), function (b) { b.classList.toggle('on', b === t); });
+      document.getElementById('pf-rolehint').textContent = roleHint(state.personForm.role);
+    }
+    else if (t.hasAttribute('data-papp')) {
+      state.personForm.apprentice = !state.personForm.apprentice;
+      t.setAttribute('aria-checked', state.personForm.apprentice); t.querySelector('.switch').classList.toggle('on', state.personForm.apprentice);
+    }
+    else if (t.hasAttribute('data-swatch')) {
+      state.catForm.color = t.getAttribute('data-swatch');
+      [].forEach.call(document.querySelectorAll('#cf-colors .swatch'), function (b) { b.classList.toggle('on', b === t); });
+    }
+    return true;
   }
 
   /* ---------- Events ---------- */
@@ -891,6 +1196,9 @@
       state.view = 'post'; state.postId = m[1];
       if (!isUnread(byId(m[1]))) state.flow = null;
       else if (!state.flow) state.flow = { total: unreadQueue().length, done: 0, justRead: [] };
+    } else if (/^#\/readers\/(.+)$/.test(h) && byId(h.slice(10)) && byId(h.slice(10)).canEdit) {
+      state.view = 'readers'; state.postId = h.slice(10);
+      if (!state.readers || state.readers.postId !== state.postId) loadReaders(state.postId);
     } else if (h === '#/compose' && state.draft && state.canPost) {
       state.view = 'compose';
     } else {
