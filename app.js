@@ -337,18 +337,21 @@
         icon(/^sms:/i.test(l.url) ? 'message-circle' : 'external-link') + '<span>' + esc(l.label) + '</span>' + icon('chevron-right') + '</a>';
     }).join('');
 
-    var foot = '';
     var hold = unread && state.holdFor === p.id;
     state.holdFor = '';
+    // A Back button sits in the bottom bar, in easy reach of a thumb. The top arrow still works too.
+    var backBtn = '<button class="bar-back" data-back="1" aria-label="Back">' + icon('chevron-left') + '</button>';
+    var foot;
     if (unread) {
       var more = f && f.done + 1 < f.total;
-      foot = '<div class="readbar"><div class="readbar-in">' +
-        '<button class="btn btn-primary' + (hold ? ' holding' : '') + '" id="markread"' + (hold ? ' disabled data-hold="1"' : '') + '>' + icon('check') + esc(p.buttonText || 'Mark as read') + '</button>' +
+      foot = '<div class="readbar"><div class="readbar-in"><div class="readbar-row">' + backBtn +
+        '<button class="btn btn-primary' + (hold ? ' holding' : '') + '" id="markread"' + (hold ? ' disabled data-hold="1"' : '') + '>' + icon('check') + esc(p.buttonText || 'Mark as read') + '</button></div>' +
         '<p class="readbar-note">Tapping this confirms you\'ve read and understood it.' + (more ? ' Then you\'ll go to the next one.' : '') + '</p>' +
       '</div></div>';
-    } else if (p.readAt) {
-      foot = '<div class="readbar quiet"><div class="readbar-in"><div class="read-done">' + icon('check') +
-        'You read this ' + (dayKey(asDate(p.readAt)) === dayKey(new Date()) ? 'today' : 'on ' + fullDate(p.readAt)) + '</div></div></div>';
+    } else {
+      foot = '<div class="readbar quiet"><div class="readbar-in"><div class="readbar-row">' + backBtn +
+        (p.readAt ? '<div class="read-done">' + icon('check') + 'You read this ' + (dayKey(asDate(p.readAt)) === dayKey(new Date()) ? 'today' : 'on ' + fullDate(p.readAt)) + '</div>'
+          : '<button class="back-text" data-back="1">Back</button>') + '</div></div></div>';
     }
 
     return '<div class="screen post-screen' + (foot ? ' has-bar' : '') + '">' +
@@ -960,7 +963,8 @@
       (left ? '<button class="btn btn-outline" data-nudge="all" style="margin-top:14px">' + icon('mail') + 'Nudge all ' + left + '</button>' : '') +
       (total ? '' : '<p class="muted" style="margin-top:16px">Nobody is in this post\'s audience right now.</p>') +
       section('Read', g.read, 'read') + section('Opened but not marked', g.opened, 'opened') + section('Not opened', g.notOpened, 'not') +
-      '<p class="fine">The full record is in your Sheet, in the Reads and Views tabs.</p></div>';
+      '<p class="fine">The full record is in your Sheet, in the Reads and Views tabs.</p></div>' +
+      '<div class="readbar quiet"><div class="readbar-in"><div class="readbar-row"><button class="bar-back" data-back="1" aria-label="Back">' + icon('chevron-left') + '</button><button class="back-text" data-back="1">Back to the post</button></div></div></div>';
   }
 
   function nudge(who) {
