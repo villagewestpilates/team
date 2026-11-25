@@ -248,3 +248,12 @@ html, body { overflow-x: hidden; }
 .ptr svg.ic { width: 20px; height: 20px; }
 .ptr.spin svg.ic { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Screen changes: nothing on the page animates. A veil fades off the top instead. */
+.screen, .screen.fade, .screen.slide, .center { animation: none !important; }
+.veil { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 15; }
+.veil.go { animation: veil .22s ease-out both; }
+@keyframes veil { from { opacity: .9; } to { opacity: 0; } }
+.post-row .row-read { color: var(--green); font-size: 14px; font-weight: 600; flex: none; gap: 3px; }
+.post-row .row-read svg.ic { width: 15px; height: 15px; stroke-width: 2.5; color: var(--green); }
+.post-row { gap: 10px; }
