@@ -122,21 +122,21 @@ const log = [];
   s = await session(fullSet());
   await s.page.goto(base + '?k=' + K); await s.page.waitForSelector('.todo');
   await s.page.click('[data-tab="bulletins"]'); await s.page.waitForSelector('#search'); await s.page.waitForTimeout(300);
-  check('bulletins pinned first', (await s.page.$eval('#list > *:first-child', e => e.textContent)).includes('Holiday open house'));
+  check('bulletins pinned first, in their own group', (await s.page.textContent('.pin-group')).includes('Holiday open house') && (await s.page.textContent('.pin-label')).trim() === 'Pinned');
   await shot(s.page, '09-bulletins'); await s.page.screenshot({ path: path.join(OUT, '09-bulletins-full.png'), fullPage: true });
   await s.page.click('[data-filter="unread"]'); await s.page.waitForTimeout(150);
   check('unread filter shows 3 cards', (await s.page.$$('#list .post-card')).length === 3 && (await s.page.$$('#list .post-row')).length === 0);
   await s.page.click('[data-filter="cat_schedule"]'); await s.page.waitForTimeout(150);
-  check('category filter', (await s.page.$$('#list > *')).length === 2);
+  check('category filter', (await s.page.$$('#list .post-card, #list .post-row')).length === 2);
   await s.page.click('[data-filter="all"]');
   await s.page.fill('#search', 'thanksgiving'); await s.page.waitForTimeout(150);
-  check('search finds one', (await s.page.$$('#list > *')).length === 1);
+  check('search finds one', (await s.page.$$('#list .post-card, #list .post-row')).length === 1);
   check('search keeps focus', await s.page.evaluate(() => document.activeElement.id === 'search'));
   await s.page.fill('#search', 'zzzz'); await s.page.waitForTimeout(150);
   check('search empty state', (await s.page.textContent('.empty .calm-title')) === 'No posts match');
   await shot(s.page, '10-bulletins-empty');
   await s.page.click('[data-clear]'); await s.page.waitForTimeout(150);
-  check('clear restores list', (await s.page.$$('#list > *')).length === 6);
+  check('clear restores list', (await s.page.$$('#list .post-card, #list .post-row')).length === 6);
   check('no script errors (bulletins)', s.errors.length === 0, s.errors.join(' | '));
   await s.ctx.close();
 
@@ -172,6 +172,12 @@ const log = [];
   await s.page.waitForSelector('.todo');
   const t0 = Date.now(); await s.page.reload(); await s.page.waitForSelector('.todo'); const ms = Date.now() - t0;
   check('second visit shows instantly from memory', ms < 1500, ms + ' ms with a 2.5 s server');
+  await s.ctx.close();
+
+  // 5b. An icon saved while on another tab still opens on Home.
+  s = await session(fullSet());
+  await s.page.goto(base + '?k=' + K + '#/contact'); await s.page.waitForSelector('.todo');
+  check('opening the app always starts on Home', (await s.page.textContent('.tab.on')).trim() === 'Home' && s.page.url().endsWith('#/home'), s.page.url().slice(-20));
   await s.ctx.close();
 
   // 6. Narrow phone (320px) and a link from an email straight to a post.

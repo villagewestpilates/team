@@ -209,7 +209,7 @@
   function extras(p) {
     var out = '';
     if (isNew(p)) out += '<span class="mini mini-new">New</span>';
-    if (p.pinned) out += '<span class="mini">' + icon('pin') + 'Pinned</span>';
+    if (p.pinned) out += '<span class="mini mini-pin">' + icon('pin') + 'Pinned</span>';
     if (p.updated) out += '<span class="mini mini-updated">Updated</span>';
     if (p.eventDate) out += '<span class="mini">' + fullDate(p.eventDate) + '</span>';
     return out ? '<div class="minis">' + out + '</div>' : '';
@@ -236,7 +236,7 @@
     return '<button class="post-row" data-open="' + esc(p.id) + '">' +
       '<span class="dot" style="background:' + esc(c.color) + '"></span>' +
       '<span class="post-row-text"><span class="post-row-title">' + esc(p.title) + '</span>' +
-      '<span class="post-row-sub">' + (p.pinned ? '<span class="row-pin">' + icon('pin') + '</span>' : '') + sub + '</span></span>' +
+      '<span class="post-row-sub">' + (p.pinned ? '<span class="mini mini-pin">' + icon('pin') + 'Pinned</span>' : '') + sub + '</span></span>' +
       status + icon('chevron-right') +
     '</button>';
   }
@@ -296,7 +296,11 @@
         '<div class="calm-sub">' + (filtered ? 'Try a different word or filter.' : 'New posts from the studio will show up here.') + '</div>' +
         (filtered ? '<button class="btn btn-outline sm" data-clear="1">Show all posts</button>' : '') + '</div>';
     }
-    return list.map(function (p) { return isUnread(p) ? unreadCard(p) : compactRow(p, p.readAt ? 'Read' : ''); }).join('');
+    var one = function (p) { return isUnread(p) ? unreadCard(p) : compactRow(p, p.readAt ? 'Read' : ''); };
+    var pins = list.filter(function (p) { return p.pinned; }), rest = list.filter(function (p) { return !p.pinned; });
+    if (!pins.length) return rest.map(one).join('');
+    return '<h2 class="section-label pin-label">' + icon('pin') + 'Pinned</h2><div class="pin-group">' + pins.map(one).join('') + '</div>' +
+      (rest.length ? '<h2 class="section-label">Latest</h2>' + rest.map(one).join('') : '');
   }
 
   function chips() {
@@ -1378,8 +1382,13 @@
 
   function firstRoute() {
     // A link from an email can point at one post with &p=POSTID.
-    var p = new URLSearchParams(location.search).get('p');
-    if (p && byId(p) && !location.hash) replaceRoute('#/post/' + p);
+    // Opening the app always starts on Home, whatever screen it was on when the icon was saved.
+    // The one exception is an email link that points at a post with &p=POSTID.
+    var qs = new URLSearchParams(location.search), p = qs.get('p'), start = '#/home';
+    var keep = [];
+    qs.forEach(function (v, k) { if (k !== 'p') keep.push(encodeURIComponent(k) + '=' + encodeURIComponent(v)); });
+    if (p && byId(p)) start = '#/post/' + p;
+    try { history.replaceState({ vwp: 1, d: 0 }, '', location.pathname + (keep.length ? '?' + keep.join('&') : '') + start); } catch (e) {}
     routeFromHash();
     if (!history.state) replaceRoute(location.hash || '#/home');
   }
