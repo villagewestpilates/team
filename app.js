@@ -17,7 +17,7 @@
     view: 'tab',            // 'tab' | 'post' | 'done'
     postId: '',             // open post
     flow: null,             // { total, done, justRead: [ids] } while reading through unread posts
-    filter: 'all', search: '',
+    filter: 'all', search: '', lastSeen: lsGet('vwp.seen'), holdFor: '',
     loadedAt: 0
   };
 
@@ -98,6 +98,8 @@
     for (var i = 0; i < state.posts.length; i++) if (state.posts[i].id === id) return state.posts[i];
     return null;
   }
+  /** Posted since this person last opened the app, and not written by them. */
+  function isNew(p) { return !!state.lastSeen && !p.mine && !p.readAt && p.createdAt > state.lastSeen; }
   function isUnread(p) { return p.needsRead && p.forMe && !p.readAt; }
   function newestFirst(a, b) { return a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0; }
   function pinnedThenNewest(a, b) { return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || newestFirst(a, b); }
@@ -160,7 +162,6 @@
   function header() {
     var me = state.me;
     return '<header class="hello">' +
-      '<div class="avatar" aria-hidden="true">' + esc(me.firstName.charAt(0).toUpperCase()) + '</div>' +
       '<div class="hello-text"><div class="hello-small">' + greeting() + '</div>' +
       '<div class="hello-name">' + esc(me.firstName) + '</div></div>' +
       '<div class="brand"><span class="wordmark">VILLAGE WEST</span>' +
@@ -179,11 +180,12 @@
     return '';
   }
   function metaLine(p) {
-    var bits = [esc(p.author), fullDate(p.createdAt)];
+    var bits = ['By ' + esc(p.author), fullDate(p.createdAt)];
     return bits.join(' · ');
   }
   function extras(p) {
     var out = '';
+    if (isNew(p)) out += '<span class="mini mini-new">New</span>';
     if (p.pinned) out += '<span class="mini">' + icon('pin') + 'Pinned</span>';
     if (p.updated) out += '<span class="mini mini-updated">Updated</span>';
     if (p.eventDate) out += '<span class="mini">' + fullDate(p.eventDate) + '</span>';
@@ -206,8 +208,8 @@
   function compactRow(p, when) {
     var c = cat(p.categoryId);
     var sub = p.readAt
-      ? '<span class="row-read">' + icon('check') + esc(when || 'Read') + '</span> · ' + esc(p.author)
-      : esc(p.author) + ' · ' + fullDate(p.createdAt);
+      ? '<span class="row-read">' + icon('check') + esc(when || 'Read') + '</span><span class="sep">·</span>By ' + esc(p.author)
+      : 'By ' + esc(p.author) + '<span class="sep">·</span>' + fullDate(p.createdAt);
     return '<button class="post-row" data-open="' + esc(p.id) + '">' +
       '<span class="dot" style="background:' + esc(c.color) + '"></span>' +
       '<span class="post-row-text"><span class="post-row-title">' + esc(p.title) + '</span>' +
@@ -313,10 +315,12 @@
     }).join('');
 
     var foot = '';
+    var hold = unread && state.holdFor === p.id;
+    state.holdFor = '';
     if (unread) {
       var more = f && f.done + 1 < f.total;
       foot = '<div class="readbar"><div class="readbar-in">' +
-        '<button class="btn btn-primary" id="markread">' + icon('check') + esc(p.buttonText || 'Mark as read') + '</button>' +
+        '<button class="btn btn-primary' + (hold ? ' holding' : '') + '" id="markread"' + (hold ? ' disabled data-hold="1"' : '') + '>' + icon('check') + esc(p.buttonText || 'Mark as read') + '</button>' +
         '<p class="readbar-note">Tapping this confirms you\'ve read and understood it.' + (more ? ' Then you\'ll go to the next one.' : '') + '</p>' +
       '</div></div>';
     } else if (p.readAt) {
@@ -375,6 +379,8 @@
     app.innerHTML = html;
     var scr = app.querySelector('.screen');
     if (scr && anim) scr.classList.add(anim);
+    var held = document.querySelector('#markread[data-hold]');
+    if (held) setTimeout(function () { held.disabled = false; held.classList.remove('holding'); }, 3000);
     tabbar.hidden = state.view === 'post';
     if (!tabbar.hidden) renderTabbar();
   }
@@ -417,6 +423,8 @@
       state.flow = opts.keepFlow ? state.flow : null;
     }
     state.view = 'post'; state.postId = id;
+    // Longer posts get a short pause before the button turns on, so it can't be tapped by reflex.
+    state.holdFor = isUnread(p) && p.body.length > 280 ? id : '';
     if (opts.replace) replaceRoute('#/post/' + id); else pushRoute('#/post/' + id);
     render(opts.anim || 'slide');
     window.scrollTo(0, 0);
@@ -573,7 +581,7 @@
     if (!history.state) replaceRoute(location.hash || '#/home');
   }
 
-  var booting = false;
+  var booting = false, seenSaved = false;
   function boot() {
     if (booting) return;
     var fromLink = new URLSearchParams(location.search).get('k') || '';
@@ -599,6 +607,7 @@
         applyData(res);
         saveCache(res);
         lsSet(STORE_KEY, state.k);
+        if (!seenSaved) { seenSaved = true; lsSet('vwp.seen', res.serverTime || new Date().toISOString()); }
         if (first) { firstRoute(); render('fade'); }
         else if (state.view === 'tab' && !wasTyping) { var y = window.scrollY; render(); window.scrollTo(0, y); }
         else if (state.view === 'tab') { refreshBulletins(); renderTabbar(); }
@@ -617,17 +626,55 @@
     });
   }
 
-  // When someone comes back to the app after a while, quietly check for new posts.
-  document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible' && state.me && Date.now() - state.loadedAt > 60000 && !marking) {
-      state.loadedAt = Date.now();
-      api('boot', { quiet: true }).then(function (res) {
-        if (!res || !res.ok) return;
+  function refresh(done) {
+    state.loadedAt = Date.now();
+    api('boot', { quiet: true }).then(function (res) {
+      if (res && res.ok) {
         var typing = document.activeElement && document.activeElement.id === 'search';
         applyData(res); saveCache(res);
         if (state.view === 'tab' && !typing) { var y = window.scrollY; render(); window.scrollTo(0, y); }
-      }).catch(function () {});
-    }
+      }
+      if (done) done(!!(res && res.ok));
+    }).catch(function () { if (done) done(false); });
+  }
+
+  // When someone comes back to the app after a while, quietly check for new posts.
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && state.me && Date.now() - state.loadedAt > 60000 && !marking) refresh();
+  });
+
+  // Pull down on Home or Bulletins to check for new posts.
+  var ptr = document.createElement('div');
+  ptr.className = 'ptr'; ptr.setAttribute('aria-hidden', 'true');
+  ptr.innerHTML = icon('refresh-cw');
+  document.body.appendChild(ptr);
+  var pull = { y: 0, on: false, d: 0, busy: false };
+  function canPull() { return state.me && state.view === 'tab' && (state.tab === 'home' || state.tab === 'bulletins') && window.scrollY <= 0 && !pull.busy; }
+  document.addEventListener('touchstart', function (e) {
+    pull.on = canPull() && e.touches.length === 1; pull.y = e.touches[0].clientY; pull.d = 0;
+  }, { passive: true });
+  document.addEventListener('touchmove', function (e) {
+    if (!pull.on) return;
+    pull.d = e.touches[0].clientY - pull.y;
+    if (pull.d <= 0 || window.scrollY > 0) { ptr.style.transform = ''; ptr.style.opacity = 0; return; }
+    var t = Math.min(pull.d * 0.45, 64);
+    ptr.style.transition = 'none';
+    ptr.style.opacity = Math.min(t / 50, 1);
+    ptr.style.transform = 'translate(-50%,' + t + 'px) rotate(' + (t * 4) + 'deg)';
+  }, { passive: true });
+  document.addEventListener('touchend', function () {
+    if (!pull.on) return;
+    pull.on = false;
+    ptr.style.transition = '';
+    if (pull.d * 0.45 >= 56) {
+      pull.busy = true;
+      ptr.classList.add('spin'); ptr.style.transform = 'translate(-50%,56px)'; ptr.style.opacity = 1;
+      refresh(function (ok) {
+        pull.busy = false;
+        ptr.classList.remove('spin'); ptr.style.transform = ''; ptr.style.opacity = 0;
+        if (!ok) toast('Couldn\'t check right now. Try again in a moment.');
+      });
+    } else { ptr.style.transform = ''; ptr.style.opacity = 0; }
   });
 
   boot();

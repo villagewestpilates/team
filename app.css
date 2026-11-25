@@ -229,3 +229,22 @@ svg.ic { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor
 /* Toast sits at the top so it never covers the Mark as read button. */
 .toast { bottom: auto; top: calc(14px + var(--safe-t)); transform: translate(-50%, -16px); }
 .toast.show { transform: translate(-50%, 0); }
+
+/* ---------- Stage 2 polish ---------- */
+/* Screens fade in without moving, so nothing appears to shift or resize when a post opens. */
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.screen.slide { animation: fade .2s ease both; }
+.readbar { animation: none; }
+html, body { overflow-x: hidden; }
+.hello { margin-bottom: 22px; }
+.hello-small { font-size: 15px; }
+.hello-name { font-size: 26px; }
+.sep { margin: 0 2px; }
+.mini-new { color: #fff; background: var(--badge); border-radius: 999px; padding: 1px 8px; font-weight: 600; font-size: 12px; }
+.btn.holding { position: relative; overflow: hidden; opacity: .7; }
+.btn.holding::after { content: ""; position: absolute; left: 0; bottom: 0; height: 4px; width: 100%; background: rgba(255,255,255,.55); transform-origin: left; animation: hold 3s linear both; }
+@keyframes hold { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.ptr { position: fixed; top: calc(var(--safe-t) - 44px); left: 50%; width: 40px; height: 40px; border-radius: 50%; background: #fff; border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; color: var(--green); opacity: 0; transform: translate(-50%, 0); transition: transform .2s ease, opacity .2s ease; z-index: 30; pointer-events: none; }
+.ptr svg.ic { width: 20px; height: 20px; }
+.ptr.spin svg.ic { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
