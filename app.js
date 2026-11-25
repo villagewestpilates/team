@@ -898,7 +898,7 @@
       var lines = '<div class="sum"><span>Goes out</span><b>' + (later ? esc(whenFull(whenIso)) : 'Now') + '</b></div>' +
         '<div class="sum"><span>Goes to</span><b>' + esc(who) + '</b></div>' +
         '<div class="sum"><span>Mark as read</span><b>' + (d.needsRead ? (d.readBy ? 'Yes, by ' + fullDate(d.readBy) : 'Yes') : 'Not needed') + '</b></div>' +
-        (d.needsRead ? '<div class="sum"><span>Email</span><b>' + (d.skipEmail ? 'Skipped' : 'Starts once email is switched on') + '</b></div>' : '');
+        (d.needsRead ? '<div class="sum"><span>Email</span><b>' + esc(emailLine(d, later)) + '</b></div>' : '');
       return sheet('<h2>' + (later ? 'Ready to schedule?' : 'Ready to post?') + '</h2><p class="sheet-title">' + esc(d.title.trim()) + '</p>' + lines +
         '<button class="btn btn-primary" data-sheet="post">' + (later ? 'Schedule it' : 'Post now') + '</button><button class="btn btn-ghost" data-sheet="close">Keep editing</button>');
     }
@@ -914,6 +914,22 @@
     var d = state.draft; if (!d) return;
     if (!d.title.trim()) { toast('Give the draft a title first'); return focusField('f-title'); }
     sendPost('', true);
+  }
+
+  function emailLine(d, later) {
+    var m = state.settings.emailMode;
+    if (d.skipEmail) return 'Skipped for this post';
+    if (m === 'live') return later ? 'Sent when it goes out' : 'Yes, to everyone it goes to';
+    if (m === 'test') return 'Test only. The team gets nothing.';
+    return 'Off for now';
+  }
+  function emailToast(res, word) {
+    var e = res.email;
+    if (!e || e.skipped || e.mode === 'off') return word;
+    if (e.quota) return word + '. The email didn\'t go out: today\'s limit is used up.';
+    if (e.error) return word + '. The email didn\'t send, so nudge people later.';
+    if (e.mode === 'test') return e.sent ? word + '. One test email went to the test address only.' : word;
+    return e.sent ? word + ' and emailed ' + e.sent + (e.sent === 1 ? ' person' : ' people') : word;
   }
 
   var sending = false;
@@ -948,7 +964,7 @@
       state.view = 'post'; state.postId = res.postId;
       replaceRoute('#/post/' + res.postId);
       render('fade'); window.scrollTo(0, 0);
-      toast(res.isNew || d.wasStatus ? 'Posted' : res.real ? 'Saved. Everyone will be asked to read it again.' : 'Saved');
+      toast(res.isNew || d.wasStatus ? emailToast(res, 'Posted') : res.real ? emailToast(res, 'Saved. Everyone is asked to read it again') : 'Saved');
     }).catch(function () {
       sending = false; closeSheet();
       toast('That didn\'t send. Check your connection and try again. Your post is still here.');
@@ -1026,6 +1042,7 @@
         var sub = kind === 'read' ? 'Read ' + whenText(x.at)
           : kind === 'opened' ? 'Opened ' + whenText(x.at)
           : (x.lastVisit ? 'Last in the app ' + whenText(x.lastVisit) : 'Hasn\'t opened the app yet');
+        if (kind !== 'read' && x.nudgedAt) sub += ' · Nudged ' + whenText(x.nudgedAt);
         return '<div class="person-row"><span class="person-row-text"><span class="person-name">' + esc(x.name) + '</span><span class="person-sub">' + esc(sub) + '</span></span>' +
           (kind === 'read' ? '<span class="row-read">' + icon('check') + '</span>' : '<button class="mini-btn" data-nudge="' + esc(x.id) + '">Nudge</button>') + '</div>';
       }).join('') + '</div>';
@@ -1045,7 +1062,12 @@
     var r = state.readers; if (!r || !r.groups) return;
     var ids = who === 'all' ? r.groups.opened.concat(r.groups.notOpened).map(function (x) { return x.id; }) : [who];
     api('nudge', { postId: state.postId, ids: ids }).then(function (res) {
-      toast(res && res.ok ? (ids.length === 1 ? 'Nudge sent' : 'Nudges sent to ' + (res.sent || ids.length)) : (res && res.message) || 'That didn\'t send.');
+      if (!res || !res.ok) return toast((res && res.message) || 'That didn\'t send.');
+      if (res.mode === 'test') return toast('Test nudge sent to the test address only. The team got nothing.');
+      var now = new Date().toISOString(), g = state.readers && state.readers.groups;
+      if (g) g.opened.concat(g.notOpened).forEach(function (x) { if ((res.nudged || []).indexOf(x.id) !== -1) x.nudgedAt = now; });
+      if (state.view === 'readers') { var y = window.scrollY; render(); window.scrollTo(0, y); }
+      toast(res.sent === 1 ? 'Nudge sent' : 'Nudged ' + res.sent + ' people');
     }).catch(function () { toast('That didn\'t send. Check your connection.'); });
   }
 
@@ -1093,9 +1115,28 @@
       (off.length ? '<h2 class="section-label">Deactivated <span class="n">' + off.length + '</span></h2><div class="rows-list">' + off.map(row).join('') + '</div>' : '') +
       '<h2 class="section-label">App settings</h2>' +
       '<div class="group" style="margin-top:0">' + toggle('beta', state.settings.beta, 'Show the Beta tag', 'The small tag beside VILLAGE WEST on Home.').replace('data-toggle="beta"', 'data-setting="Beta"') + '</div>' +
+      emailControl(t) +
       '<h2 class="section-label">Categories</h2><div class="rows-list">' + cats + '</div>' +
       '<button class="link-btn" data-cat-open="">' + icon('plus') + 'Add a category</button>' +
     '</div>';
+  }
+
+  var MODE_HINT = {
+    off: 'Nothing is emailed. People see new posts when they open the app.',
+    test: 'Every email goes only to the test address, marked as a test. The team gets nothing.',
+    live: 'New posts, real changes, and nudges email the team.'
+  };
+  function emailControl(t) {
+    var m = t.emailMode || 'off';
+    return '<h2 class="section-label">Email</h2><div class="seg-group">' + [['off', 'Off'], ['test', 'Test'], ['live', 'Live']].map(function (x) {
+      return '<button class="seg-btn' + (m === x[0] ? ' on' : '') + '" data-emailmode="' + x[0] + '" aria-pressed="' + (m === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>' +
+      '<p class="fine" style="margin-top:10px">' + MODE_HINT[m] + (m === 'test' && t.testEmail ? ' Test address: ' + esc(t.testEmail) + '.' : '') +
+      (m !== 'off' && t.emailsLeftToday != null ? ' Google allows ' + t.emailsLeftToday + ' more emails today.' : '') + '</p>';
+  }
+  function setEmailMode(m) {
+    teamCall('saveSetting', { key: 'EmailMode', value: m }, function () {
+      toast(m === 'live' ? 'Email is live. New posts will email the team.' : m === 'test' ? 'Email is in test mode' : 'Email is off');
+    });
   }
 
   function personSheet(id, note) {
@@ -1104,6 +1145,7 @@
     sheet('<h2>' + esc(x.name) + '</h2><p>' + esc(x.email) + '</p>' +
       '<div class="sum"><span>Role</span><b>' + ROLE_WORDS[x.role] + (x.apprentice ? ', Apprentice' : '') + '</b></div>' +
       '<div class="sum"><span>Last in the app</span><b>' + (x.lastVisit ? esc(whenText(x.lastVisit)) : 'Not yet') + '</b></div>' +
+      '<div class="sum"><span>Link emailed</span><b>' + (x.linkSentAt ? esc(whenText(x.linkSentAt)) : 'Not yet') + '</b></div>' +
       (x.deactivated
         ? '<p class="note">Deactivated. Their link is off and their read history is kept.</p><button class="btn btn-primary" data-sheet="reactivate" data-arg="' + esc(x.id) + '">Reactivate</button>'
         : (note ? '<p class="note">' + esc(note) + '</p>' : '') +
@@ -1169,7 +1211,16 @@
   function teamSheetAction(what, arg) {
     var x = arg ? person(arg) : null, first = x ? x.firstName : '';
     if (what === 'copy') { copyText(linkFor(x)).then(function () { toast('Link copied. Paste it into a text or email to ' + first + '.'); }, function () { toast('Couldn\'t copy. Press and hold the link to copy it.'); }); return true; }
-    if (what === 'emaillink') { api('emailLink', { id: arg }).then(function (res) { toast(res && res.ok ? 'Link emailed to ' + first : (res && res.message) || 'That didn\'t send.'); }).catch(function () { toast('That didn\'t send.'); }); return true; }
+    if (what === 'emaillink') {
+      api('emailLink', { id: arg }).then(function (res) {
+        if (!res || !res.ok) return toast((res && res.message) || 'That didn\'t send.');
+        applyTeam(res);
+        toast(res.mode === 'test' ? 'Test email sent to the test address only. ' + first + ' got nothing.' : 'Link emailed to ' + first);
+        if (res.mode !== 'test') personSheet(arg);
+      }).catch(function () { toast('That didn\'t send.'); });
+      return true;
+    }
+    if (what === 'golive') { closeSheet(); setEmailMode('live'); return true; }
     if (what === 'editperson') { personForm(arg); return true; }
     if (what === 'backtoperson') { personSheet(arg); return true; }
     if (what === 'asknewlink') {
@@ -1209,8 +1260,17 @@
   }
 
   function stage4Click(e) {
-    var t = e.target.closest('[data-res-edit],[data-res-add],[data-res-clear],[data-rsec],[data-raud],[data-readers],[data-nudge],[data-person-open],[data-person-add],[data-cat-open],[data-setting],[data-teamreload],[data-prole],[data-papp],[data-swatch]');
+    var t = e.target.closest('[data-emailmode],[data-res-edit],[data-res-add],[data-res-clear],[data-rsec],[data-raud],[data-readers],[data-nudge],[data-person-open],[data-person-add],[data-cat-open],[data-setting],[data-teamreload],[data-prole],[data-papp],[data-swatch]');
     if (!t) return false;
+    if (t.hasAttribute('data-emailmode')) {
+      var em = t.getAttribute('data-emailmode');
+      if (em === (state.team && state.team.emailMode)) return true;
+      if (em === 'live') {
+        sheet('<h2>Turn on email to the team?</h2><p>From now on, new posts, real changes, and nudges will email real team members. Nothing already posted gets sent.</p>' +
+          '<button class="btn btn-primary" data-sheet="golive">Turn it on</button><button class="btn btn-ghost" data-sheet="close">Not yet</button>');
+      } else setEmailMode(em);
+      return true;
+    }
     if (t.hasAttribute('data-res-edit')) return resForm(t.getAttribute('data-res-edit')), true;
     if (t.hasAttribute('data-res-add')) return resForm(''), true;
     if (t.hasAttribute('data-res-clear')) { state.resSearch = ''; render(); return true; }
