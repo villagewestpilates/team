@@ -13,7 +13,7 @@ const base0 = { categoryId: 'c', pinned: false, needsRead: true, readBy: '', eve
 (async () => {
   await new Promise(r => server.listen(8773, r));
   const browser = await chromium.launch(); const base = 'http://localhost:8773/';
-  const ctx = await browser.newContext(Object.assign({}, devices['iPhone 13']));
+  const ctx = await browser.newContext(Object.assign({}, devices['iPhone 13'])); await ctx.addInitScript(() => { try { localStorage.setItem('vwp.edit', '1'); } catch (e) {} });
   const page = await ctx.newPage(); const errors = []; const sent = []; page.on('pageerror', e => errors.push(String(e)));
   const cdp = await ctx.newCDPSession(page);
   const posts = [Object.assign({}, base0, { id: 'a', title: 'Skim me', body: 'Line\n'.repeat(60), author: 'Bethany', mine: false, createdAt: '2026-11-23T15:00:00Z', readAt: '' })];

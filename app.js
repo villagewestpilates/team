@@ -5,6 +5,7 @@
   var API = 'https://script.google.com/macros/s/AKfycbz7i8unoDEf_x9vOwhwvel71qbyrDs0QVSsQWK7Gm33_LzL9L3EVv3RS_AEXhrVUKMJjQ/exec';
   var STORE_KEY = 'vwp.k';
   var CACHE_KEY = 'vwp.data';
+  var EDIT_KEY = 'vwp.edit';
   var SIZE_KEY = 'vwp.size';
   var SIZES = { standard: 1, large: 1.14, largest: 1.28 };
   /** Makes everything in the app bigger for this phone only. */
@@ -48,6 +49,13 @@
   function lsSet(key, v) { try { if (v) localStorage.setItem(key, v); else localStorage.removeItem(key); } catch (e) {} }
 
   applySize();
+  /** Editing tools (pencils, New post, read counts) only show while Edit mode is on. */
+  function editing() { return lsGet(EDIT_KEY) === '1' && !!state.me && (state.canPost || state.me.role === 'admin'); }
+  function editChip() {
+    if (!state.me || !(state.canPost || state.me.role === 'admin')) return '';
+    var on = editing();
+    return '<button class="editchip' + (on ? ' on' : '') + '" data-editmode="1" role="switch" aria-checked="' + on + '" aria-label="Edit mode">' + icon('pencil') + '<span>Edit mode</span><span class="switch' + (on ? ' on' : '') + '"><span></span></span></button>';
+  }
 
   var toastTimer;
   function toast(msg) {
@@ -351,7 +359,7 @@
   }
 
   function pendingPosts() {
-    return state.posts.filter(function (p) { return p.status && p.canEdit; }).sort(function (a, b) { return (a.savedAt || '') < (b.savedAt || '') ? 1 : -1; });
+    return !editing() ? [] : state.posts.filter(function (p) { return p.status && p.canEdit; }).sort(function (a, b) { return (a.savedAt || '') < (b.savedAt || '') ? 1 : -1; });
   }
   function whenFull(iso) { return fullDate(iso) + ' at ' + fmt(iso, { hour: 'numeric', minute: '2-digit' }); }
   function pendingSection() {
@@ -412,12 +420,12 @@
 
     return '<div class="screen post-screen' + (foot ? ' has-bar' : '') + '">' +
       '<div class="post-top"><button class="back" data-back="1" aria-label="Back">' + icon('chevron-left') + '</button>' + progress +
-        (p.canEdit ? '<button class="back" data-edit="' + esc(p.id) + '" aria-label="Edit this post">' + icon('pencil') + '</button>' : '<span class="back-spacer"></span>') + '</div>' +
+        (p.canEdit && editing() ? '<button class="back" data-edit="' + esc(p.id) + '" aria-label="Edit this post">' + icon('pencil') + '</button>' : '<span class="back-spacer"></span>') + '</div>' +
       '<div class="card-top">' + catTag(p) + (unread || p.readAt ? statusPill(p) : '') + '</div>' +
       (p.status ? '<div class="sched-note">' + icon(p.status === 'draft' ? 'pencil' : 'clock') + (p.status === 'draft' ? 'Draft. Only you and admins can see it.' : 'Goes out ' + esc(whenFull(p.publishAt)) + '. Only you and admins can see it until then.') + '</div>' : '') +
       '<h1 class="post-title">' + esc(p.title) + '</h1>' +
       '<div class="meta">' + metaLine(p) + '</div>' + extras(p) +
-      (p.stats && p.needsRead ? '<button class="stats" data-readers="' + esc(p.id) + '">' + icon('users') + p.stats.read + ' of ' + p.stats.total + ' read' + icon('chevron-right') + '</button>' : '') +
+      (p.stats && p.needsRead && editing() ? '<button class="stats" data-readers="' + esc(p.id) + '">' + icon('users') + p.stats.read + ' of ' + p.stats.total + ' read' + icon('chevron-right') + '</button>' : '') +
       (p.photo ? '<button class="photo" data-photo="' + esc(p.id) + '" aria-label="See the photo full size" style="aspect-ratio:' + p.photo.w + '/' + p.photo.h + '"><span class="sk"></span></button>' : '') +
       '<div class="post-body">' + renderBody(p.body) + '</div>' +
       (links ? '<div class="links">' + links + '</div>' : '') +
@@ -465,8 +473,9 @@
       html = renderDone();
     } else {
       html = state.tab === 'home' ? renderHome() : state.tab === 'bulletins' ? renderBulletins() : state.tab === 'team' ? renderTeam() : state.tab === 'resources' ? renderResources() : state.tab === 'contact' ? renderContact() : renderSoon();
-      if (state.canPost && (state.tab === 'home' || state.tab === 'bulletins')) {
-        html += '<button class="fab" data-compose="new">' + icon('plus') + 'New post</button>';
+      if (state.tab === 'home' || state.tab === 'bulletins' || state.tab === 'resources') {
+        html += editChip();
+        if (state.canPost && editing() && state.tab !== 'resources') html += '<button class="fab" data-compose="new">' + icon('plus') + 'New post</button>';
       }
     }
     app.innerHTML = html;
@@ -1154,6 +1163,8 @@
   function renderTeam() {
     var t = state.team;
     var head = '<div class="screen"><h1 class="page-title">Settings</h1>' + mySettings();
+    if (state.canPost || state.me.role === 'admin') head += '<h2 class="section-label">Edit mode</h2><div class="group" style="margin-top:0">' +
+      toggle('edit', editing(), 'Show editing tools', 'New post, pencils, drafts, and read counts. Off shows the app the way the team sees it. Only changes this phone.').replace('data-toggle="edit"', 'data-editmode="1"') + '</div>';
     if (state.me.role !== 'admin') return head + '</div>';
     head += '<h1 class="page-title sub-title">Team</h1>';
     if (!t) { loadTeam(); return head + '<div class="sk" style="height:56px;border-radius:16px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:26px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:10px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:10px"></div></div>'; }
@@ -1318,8 +1329,14 @@
   }
 
   function stage4Click(e) {
-    var t = e.target.closest('[data-size],[data-emailmode],[data-res-edit],[data-res-add],[data-res-clear],[data-rsec],[data-raud],[data-readers],[data-nudge],[data-person-open],[data-person-add],[data-cat-open],[data-setting],[data-teamreload],[data-prole],[data-papp],[data-swatch]');
+    var t = e.target.closest('[data-editmode],[data-size],[data-emailmode],[data-res-edit],[data-res-add],[data-res-clear],[data-rsec],[data-raud],[data-readers],[data-nudge],[data-person-open],[data-person-add],[data-cat-open],[data-setting],[data-teamreload],[data-prole],[data-papp],[data-swatch]');
     if (!t) return false;
+    if (t.hasAttribute('data-editmode')) {
+      var turnOn = !editing(); lsSet(EDIT_KEY, turnOn ? '1' : '');
+      var yy = window.scrollY; render(); window.scrollTo(0, yy);
+      toast(turnOn ? 'Edit mode is on. Editing tools are showing.' : 'Edit mode is off. This is what the team sees.');
+      return true;
+    }
     if (t.hasAttribute('data-size')) { lsSet(SIZE_KEY, t.getAttribute('data-size')); applySize(); render(); toast('Text size saved for this phone'); return true; }
     if (t.hasAttribute('data-emailmode')) {
       var em = t.getAttribute('data-emailmode');
@@ -1388,8 +1405,8 @@
     return out;
   }
   function resourceList() {
-    var admin = state.me.role === 'admin', q = state.resSearch.trim().toLowerCase();
-    var list = state.resources.filter(function (r) { return !q || (r.title + ' ' + r.section).toLowerCase().indexOf(q) !== -1; });
+    var admin = state.me.role === 'admin' && editing(), q = state.resSearch.trim().toLowerCase();
+    var list = state.resources.filter(function (r) { return (admin || r.url) && (!q || (r.title + ' ' + r.section).toLowerCase().indexOf(q) !== -1); });
     if (!list.length) {
       return '<div class="empty"><div class="bubble sm">' + icon(q ? 'search' : 'layout-grid') + '</div><div class="calm-title">' + (q ? 'Nothing matches' : 'No resources yet') + '</div>' +
         '<div class="calm-sub">' + (q ? 'Try a shorter word.' : 'Forms, documents, and links will show up here.') + '</div>' + (q ? '<button class="btn btn-outline sm" data-res-clear="1">Show everything</button>' : '') + '</div>';
@@ -1414,7 +1431,7 @@
   function renderResources() {
     return '<div class="screen"><h1 class="page-title">Resources</h1>' +
       '<label class="search">' + icon('search') + '<input id="res-search" type="search" enterkeyhint="search" autocomplete="off" placeholder="Search resources" aria-label="Search resources" value="' + esc(state.resSearch) + '"></label>' +
-      (state.me.role === 'admin' ? '<button class="btn btn-outline" data-res-add="1" style="margin-top:14px">' + icon('plus') + 'Add a resource</button>' : '') +
+      (state.me.role === 'admin' && editing() ? '<button class="btn btn-outline" data-res-add="1" style="margin-top:14px">' + icon('plus') + 'Add a resource</button>' : '') +
       '<div id="res-list">' + resourceList() + '</div></div>';
   }
 

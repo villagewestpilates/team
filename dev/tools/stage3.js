@@ -19,7 +19,7 @@ const check = (name, ok, extra) => log.push((ok ? 'PASS ' : 'FAIL ') + name + (e
   await new Promise(r => server.listen(8768, r));
   const browser = await chromium.launch(); const base = 'http://localhost:8768/';
   async function session(role, posts) {
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 }); await ctx.addInitScript(() => { try { localStorage.setItem('vwp.edit', '1'); } catch (e) {} });
     const page = await ctx.newPage(); const errors = []; const sent = [];
     page.on('pageerror', e => errors.push(String(e)));
     const canPost = role !== 'member';

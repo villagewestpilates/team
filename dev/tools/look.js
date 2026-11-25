@@ -17,7 +17,7 @@ const posts = () => [
 (async () => {
   await new Promise(r => server.listen(8774, r));
   const browser = await chromium.launch(); const base = 'http://localhost:8774/';
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 }); await ctx.addInitScript(() => { try { localStorage.setItem('vwp.edit', '1'); } catch (e) {} });
   const page = await ctx.newPage(); const errors = []; page.on('pageerror', e => errors.push(String(e)));
   await page.route('**/script.google.com/**', route => { const q = JSON.parse(route.request().postData()); route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(q.action === 'boot' ? { ok: true, me: { id: 'p', name: 'Molly Hartman', firstName: 'Molly', role: 'admin' }, settings: { beta: true }, categories: [{ id: 'c1', name: 'Announcements', color: '#3F5FC0' }, { id: 'c2', name: 'Policies', color: '#7B52B9' }, { id: 'c3', name: 'Schedule', color: '#4E8A6B' }], posts: posts(), canPost: true, people: [], resources: [{ id: 'r1', title: 'Employee Handbook', url: 'https://drive.google.com/file/d/1/view', section: 'Documents', audience: 'everyone' }, { id: 'r2', title: 'Setting the alarm', url: 'https://drive.google.com/file/d/2/view', section: 'How-to videos', audience: 'everyone' }], contacts: [{ name: 'The studio', label: 'Text the studio', phone: '+14435550100', primary: true }, { name: 'Bethany', label: 'Text Bethany', phone: '+14435550101' }] } : { ok: true }) }); });
   const shot = n => page.screenshot({ path: path.join(OUT, n + '.png') });
