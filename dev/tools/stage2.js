@@ -86,6 +86,7 @@ const log = [];
   check('progress 1 of 3', (await s.page.textContent('.progress-text')) === '1 of 3 to read');
   check('opening did not mark read', !s.calls.includes('markRead'));
   check('tab bar hidden on post', await s.page.$eval('#tabbar', e => e.hidden));
+  check('post has one Back button, at the bottom', (await s.page.$$('[data-back]')).length === 1 && !!(await s.page.$('.bar-back')));
   check('sms link opens in new tab', (await s.page.getAttribute('.link-row', 'target')) === '_blank');
   await shot(s.page, '02-post');
   await s.page.click('#markread'); await s.page.waitForTimeout(900);
@@ -123,9 +124,11 @@ const log = [];
   await s.page.goto(base + '?k=' + K); await s.page.waitForSelector('.todo');
   await s.page.click('[data-tab="bulletins"]'); await s.page.waitForSelector('#search'); await s.page.waitForTimeout(300);
   check('bulletins pinned first, in their own group', (await s.page.textContent('.pin-group')).includes('Holiday open house') && (await s.page.textContent('.pin-label')).trim() === 'Pinned');
+  check('Bulletins is one compact list: unread rows carry a coral tag', (await s.page.$$('#list .post-card')).length === 0 && (await s.page.$$('#list .post-row .pill-coral')).length === 3);
+  check('pinned group does not repeat the Pinned tag', (await s.page.$$eval('.pin-group .row-pinline', e => e.every(x => getComputedStyle(x).display === 'none'))));
   await shot(s.page, '09-bulletins'); await s.page.screenshot({ path: path.join(OUT, '09-bulletins-full.png'), fullPage: true });
   await s.page.click('[data-filter="unread"]'); await s.page.waitForTimeout(150);
-  check('unread filter shows 3 cards', (await s.page.$$('#list .post-card')).length === 3 && (await s.page.$$('#list .post-row')).length === 0);
+  check('unread filter shows 3 unread rows', (await s.page.$$('#list .post-row.is-unread')).length === 3 && (await s.page.$$('#list .post-row')).length === 3 && (await s.page.$$('#list .post-card')).length === 0);
   await s.page.click('[data-filter="cat_schedule"]'); await s.page.waitForTimeout(150);
   check('category filter', (await s.page.$$('#list .post-card, #list .post-row')).length === 2);
   await s.page.click('[data-filter="all"]');
@@ -142,18 +145,19 @@ const log = [];
 
   // 3. Saving fails: the post goes back to unread.
   s = await session(fullSet().slice(1, 2), { failMark: true });
-  await s.page.goto(base + '?k=' + K); await s.page.waitForSelector('.todo');
+  await s.page.goto(base + '?k=' + K); await s.page.waitForSelector('.post-card');
+  check('one unread post: no banner, just the card', !(await s.page.$('.todo')) && (await s.page.$$('.post-card')).length === 1);
   await s.page.click('[data-open]'); await s.page.waitForSelector('#markread'); await s.page.click('#markread');
   await s.page.waitForTimeout(1500);
   await shot(s.page, '11-save-failed');
   check('failed save: still on the post, button back', !!(await s.page.$('#markread:not([disabled])')) && (await s.page.textContent('.progress-text')) === '1 of 1 to read', await s.page.evaluate(() => document.body.innerText.slice(0, 60)));
   await s.page.click('[data-back]'); await s.page.waitForTimeout(400);
-  check('failed save: post is still unread on Home', !!(await s.page.$('.todo')));
+  check('failed save: post is still unread on Home', !!(await s.page.$('.post-card')));
   await s.ctx.close();
 
   // 3b. Saving fails after a slow wait (already moved on to "caught up").
   s = await session(fullSet().slice(1, 2), { failMark: true, delay: 1500 });
-  await s.page.goto(base + '?k=' + K); await s.page.waitForSelector('.todo');
+  await s.page.goto(base + '?k=' + K); await s.page.waitForSelector('.post-card');
   await s.page.click('[data-open]'); await s.page.waitForSelector('#markread'); await s.page.click('#markread');
   await s.page.waitForTimeout(3200);
   check('slow failed save: brought back to the post', !!(await s.page.$('#markread:not([disabled])')), await s.page.evaluate(() => document.body.innerText.slice(0, 60)));

@@ -24,21 +24,21 @@ const posts = () => [
   const fits = () => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1);
   const tabsFit = () => page.evaluate(() => [...document.querySelectorAll('.tab span:last-child')].every(s => s.scrollWidth <= s.clientWidth + 1) && [...document.querySelectorAll('.tab')].every(t => t.getBoundingClientRect().right <= window.innerWidth + 1));
 
-  await page.goto(base + '?k=' + 'k'.repeat(30)); await page.waitForSelector('.todo'); await page.waitForTimeout(400);
+  await page.goto(base + '?k=' + 'k'.repeat(30)); await page.waitForSelector('.post-card'); await page.waitForTimeout(400);
   const bg = await page.evaluate(() => [getComputedStyle(document.body).backgroundColor, getComputedStyle(document.querySelector('.post-card')).backgroundColor, getComputedStyle(document.querySelector('.post-row')).backgroundColor]);
   check('page is soft gray, cards and rows are white', bg[0] === 'rgb(243, 243, 241)' && bg[1] === 'rgb(255, 255, 255)' && bg[2] === 'rgb(255, 255, 255)', bg.join(' / '));
   await shot('01-home');
   await page.click('[data-open="a"]'); await page.waitForSelector('.post-title'); await page.waitForTimeout(300); await shot('02-post');
-  await page.click('.bar-back'); await page.waitForSelector('.todo');
+  await page.click('.bar-back'); await page.waitForSelector('.post-card');
   for (const tab of ['bulletins', 'resources', 'contact']) { await page.click('[data-tab="' + tab + '"]'); await page.waitForTimeout(350); await shot('03-' + tab); }
   await page.click('[data-tab="team"]'); await page.waitForSelector('.textsize'); await page.waitForTimeout(400); await shot('03-settings');
   check('text size control is in Settings, Standard selected', (await page.textContent('.textsize .seg-btn.on')).includes('Standard'));
-  check('not on Home any more', await (async () => { await page.click('[data-tab="home"]'); await page.waitForSelector('.todo'); const gone = !(await page.$('.textsize')); return gone; })());
+  check('not on Home any more', await (async () => { await page.click('[data-tab="home"]'); await page.waitForSelector('.post-card'); const gone = !(await page.$('.textsize')); return gone; })());
   const size0 = await page.evaluate(() => document.querySelector('.card-title').getBoundingClientRect().height);
   await page.click('[data-tab="team"]'); await page.waitForSelector('.textsize');
   for (const sz of ['large', 'largest']) {
     await page.click('[data-size="' + sz + '"]'); await page.waitForTimeout(350);
-    await page.click('[data-tab="home"]'); await page.waitForSelector('.todo');
+    await page.click('[data-tab="home"]'); await page.waitForSelector('.post-card');
     check(sz + ': saved and selected', (await page.evaluate(() => localStorage.getItem('vwp.size'))) === sz) ; if (false) check('', (await page.evaluate(() => localStorage.getItem('vwp.size'))) === sz && (await page.getAttribute('[data-size="' + sz + '"]', 'aria-pressed')) === 'true');
     check(sz + ': Home fits, no side scroll, tab names not cut off', (await fits()) && (await tabsFit()));
     await page.evaluate(() => window.scrollTo(0, 0)); await shot('04-home-' + sz);
@@ -46,15 +46,15 @@ const posts = () => [
     const bar = await page.evaluate(() => { const b = document.querySelector('#markread').getBoundingClientRect(); return b.right <= window.innerWidth + 1 && b.bottom <= window.innerHeight + 1 && b.width > 120; });
     check(sz + ': Mark as read button fully on screen', bar && (await fits()));
     await shot('05-post-' + sz);
-    await page.click('.bar-back'); await page.waitForSelector('.todo');
+    await page.click('.bar-back'); await page.waitForSelector('.post-card');
     await page.click('[data-tab="bulletins"]'); await page.waitForSelector('#search'); check(sz + ': Bulletins fits', await fits());
     await page.click('[data-tab="contact"]'); await page.waitForSelector('.contact-main'); check(sz + ': Contact fits', await fits());
     await page.click('[data-tab="team"]'); await page.waitForSelector('.textsize'); check(sz + ': Settings fits', await fits());
   }
-  await page.click('[data-tab="home"]'); await page.waitForSelector('.todo');
+  await page.click('[data-tab="home"]'); await page.waitForSelector('.post-card');
   const size2 = await page.evaluate(() => document.querySelector('.card-title').getBoundingClientRect().height);
   check('text really is bigger', size2 > size0 * 1.2, Math.round(size0) + ' to ' + Math.round(size2));
-  await page.reload(); await page.waitForSelector('.todo');
+  await page.reload(); await page.waitForSelector('.post-card');
   check('the choice is remembered after closing the app', (await page.evaluate(() => document.documentElement.style.zoom)) === '1.28');
   await page.click('[data-tab="team"]'); await page.waitForSelector('.textsize'); await page.click('[data-size="standard"]'); await page.waitForTimeout(300);
   check('back to Standard', (await page.evaluate(() => document.documentElement.style.zoom)) === '');

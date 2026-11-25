@@ -28,7 +28,7 @@
     view: 'tab',            // 'tab' | 'post' | 'done'
     postId: '',             // open post
     flow: null,             // { total, done, justRead: [ids] } while reading through unread posts
-    canPost: false, people: [], defaultCategory: '', draft: null, photos: {}, readers: null, team: null, personForm: null, catForm: null, resources: [], contacts: [], resSearch: '', resForm: null,
+    canPost: false, people: [], defaultCategory: '', draft: null, photos: {}, readers: null, team: null, setTab: 'me', personForm: null, catForm: null, resources: [], contacts: [], resSearch: '', resForm: null,
     filter: 'all', search: '', lastSeen: lsGet('vwp.seen'), holdFor: '',
     loadedAt: 0
   };
@@ -50,7 +50,8 @@
 
   applySize();
   /** Editing tools (pencils, New post, read counts) only show while Edit mode is on. */
-  function editing() { return lsGet(EDIT_KEY) === '1' && !!state.me && (state.canPost || state.me.role === 'admin'); }
+  function hasTools() { var me = state.me; if (!me) return false; return me.tools === undefined ? (me.role === 'admin' || me.role === 'poster') : !!me.tools; }
+  function editing() { return lsGet(EDIT_KEY) === '1' && hasTools(); }
   function editChip() {
     if (!state.me || !(state.canPost || state.me.role === 'admin')) return '';
     var on = editing();
@@ -60,6 +61,7 @@
   var toastTimer;
   function toast(msg) {
     toastEl.textContent = msg;
+    toastEl.classList.toggle('low', state.view === 'tab' || state.view === 'done');
     toastEl.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2600);
@@ -266,11 +268,13 @@
   function compactRow(p, when) {
     var c = cat(p.categoryId);
     var sub = 'By ' + esc(p.author) + '<span class="sep">·</span>' + fullDate(p.createdAt);
-    var status = p.readAt ? '<span class="row-read">' + icon('check') + 'Read</span>' : '';
-    return '<button class="post-row" data-open="' + esc(p.id) + '">' +
+    // 8. An unread post shows its coral tag here too, so Bulletins can be one scannable list.
+    var status = isUnread(p) ? statusPill(p) : p.readAt ? '<span class="row-read">' + icon('check') + 'Read</span>' : '';
+    return '<button class="post-row' + (isUnread(p) ? ' is-unread' : '') + '" data-open="' + esc(p.id) + '">' +
       '<span class="dot" style="background:' + esc(c.color) + '"></span>' +
-      '<span class="post-row-text"><span class="post-row-title">' + esc(p.title) + '</span>' +
-      '<span class="post-row-sub">' + (p.pinned ? '<span class="mini mini-pin">' + icon('pin') + 'Pinned</span>' : '') + sub + '</span></span>' +
+      '<span class="post-row-text">' + (p.pinned ? '<span class="row-pinline"><span class="mini mini-pin">' + icon('pin') + 'Pinned</span></span>' : '') +
+      '<span class="post-row-title">' + esc(p.title) + '</span>' +
+      '<span class="post-row-sub">' + sub + '</span></span>' +
       status + icon('chevron-right') +
     '</button>';
   }
@@ -293,7 +297,7 @@
 
     if (unread.length) {
       var due = unread[0].readBy;
-      html += '<section class="todo" data-start="1" role="button" tabindex="0" onclick="">' +
+      if (unread.length > 1) html += '<section class="todo" data-start="1" role="button" tabindex="0" onclick="">' +
         '<div class="todo-text"><div class="todo-count">' + unread.length + (unread.length === 1 ? ' post to read' : ' posts to read') + '</div>' +
         '<div class="todo-sub">' + (due ? 'Earliest due ' + fullDate(due) : 'Takes about a minute each') + '</div></div>' +
         '<button class="btn-start" data-start="1">Start</button>' +
@@ -341,7 +345,7 @@
         '<div class="calm-sub">' + (filtered ? 'Try a different word or filter.' : 'New posts from the studio will show up here.') + '</div>' +
         (filtered ? '<button class="btn btn-outline sm" data-clear="1">Show all posts</button>' : '') + '</div>';
     }
-    var one = function (p) { return isUnread(p) ? unreadCard(p) : compactRow(p, p.readAt ? 'Read' : ''); };
+    var one = function (p) { return compactRow(p, p.readAt ? 'Read' : ''); };
     var pins = list.filter(function (p) { return p.pinned; }), rest = list.filter(function (p) { return !p.pinned; });
     if (!pins.length) return rest.map(one).join('');
     return '<h2 class="section-label pin-label">' + icon('pin') + 'Pinned</h2><div class="pin-group">' + pins.map(one).join('') + '</div>' +
@@ -419,8 +423,8 @@
     }
 
     return '<div class="screen post-screen' + (foot ? ' has-bar' : '') + '">' +
-      '<div class="post-top"><button class="back" data-back="1" aria-label="Back">' + icon('chevron-left') + '</button>' + progress +
-        (p.canEdit && editing() ? '<button class="back" data-edit="' + esc(p.id) + '" aria-label="Edit this post">' + icon('pencil') + '</button>' : '<span class="back-spacer"></span>') + '</div>' +
+      (progress || (p.canEdit && editing()) ? '<div class="post-top"><span class="back-spacer"></span>' + progress +
+        (p.canEdit && editing() ? '<button class="back" data-edit="' + esc(p.id) + '" aria-label="Edit this post">' + icon('pencil') + '</button>' : '<span class="back-spacer"></span>') + '</div>' : '<div class="post-top-gap"></div>') +
       '<div class="card-top">' + catTag(p) + (unread || p.readAt ? statusPill(p) : '') + '</div>' +
       (p.status ? '<div class="sched-note">' + icon(p.status === 'draft' ? 'pencil' : 'clock') + (p.status === 'draft' ? 'Draft. Only you and admins can see it.' : 'Goes out ' + esc(whenFull(p.publishAt)) + '. Only you and admins can see it until then.') + '</div>' : '') +
       '<h1 class="post-title">' + esc(p.title) + '</h1>' +
@@ -537,7 +541,7 @@
 
   function goTab(tab, push) {
     state.view = 'tab'; state.tab = tab; state.flow = null;
-    if (tab === 'team') state.team = null;
+    if (tab === 'team') { state.team = null; state.setTab = 'me'; }
     if (push !== false) pushRoute('#/' + tab); else replaceRoute('#/' + tab);
     render('fade');
     window.scrollTo(0, 0);
@@ -779,7 +783,7 @@
       return '<div class="photo-pick has">' + (state.photos[d.id] ? '<img src="' + state.photos[d.id] + '" alt="Current photo">' : '<div class="photo-note">This post has a photo.</div>') +
         '<button class="photo-x" data-rmphoto="1" aria-label="Remove photo">' + icon('x') + '</button></div>';
     }
-    return '<button class="photo-pick" data-addphoto="1">' + icon('plus') + '<span>Add a photo</span><small>Optional. One per post.</small></button>';
+    return '<button class="photo-pick" data-addphoto="1">' + icon('plus') + '<span>Add a photo</span><small>One per post.</small></button>';
   }
 
   function postAs(d) {
@@ -822,17 +826,18 @@
         '<button data-fmt="bold" aria-label="Bold"><b>B</b> Bold</button><button data-fmt="list" aria-label="Bullet list">' + icon('list') + 'List</button></div></div>' +
       '<textarea class="input body-input" id="f-body" data-f="body" rows="7" placeholder="Write it the way you\'d say it. Links you paste become tappable.">' + esc(d.body) + '</textarea>' +
 
-      '<div class="lbl">Photo</div><div id="photo-field">' + photoField(d) + '</div>' +
-      '<input type="file" id="photo-input" accept="image/*" hidden>' +
+      '<div class="lbl">Who sees it</div><div class="seg-group">' + auds + '</div>' + people +
 
       '<div class="lbl">Category</div><div class="chips wrap">' + cats + '</div>' +
       (isPromo(d.categoryId) ? '<label class="lbl" for="f-event">Event or end date <span class="opt">optional</span></label><input class="input" type="date" id="f-event" data-f="eventDate" value="' + esc(d.eventDate) + '">' : '') +
 
-      '<div class="lbl">Who sees it</div><div class="seg-group">' + auds + '</div>' + people +
+      '<div class="lbl">Photo <span class="opt">optional</span></div><div id="photo-field">' + photoField(d) + '</div>' +
+      '<input type="file" id="photo-input" accept="image/*" hidden>' +
 
-      (notOutYet(d) ? '<div class="lbl">When it goes out</div><div class="seg-group">' +
-        '<button class="seg-btn' + (d.when !== 'later' ? ' on' : '') + '" data-when="now">Now</button><button class="seg-btn' + (d.when === 'later' ? ' on' : '') + '" data-when="later">Later</button></div>' +
-        (d.when === 'later' ? '<input class="input" type="datetime-local" id="f-when" data-f="publishLocal" min="' + localInput(new Date().toISOString()) + '" value="' + esc(d.publishLocal) + '" aria-label="Date and time to post" style="margin-top:8px"><p class="fine" style="margin-top:6px">Studio time (Eastern).</p>' : '') : '') +
+      (notOutYet(d) && d.when === 'later' ? '<div class="sched-box"><label class="lbl" for="f-when" style="margin-top:0">' + icon('clock') + 'Scheduled for</label>' +
+        '<input class="input" type="datetime-local" id="f-when" data-f="publishLocal" min="' + localInput(new Date().toISOString()) + '" value="' + esc(d.publishLocal) + '" aria-label="Date and time to post">' +
+        '<p class="fine" style="margin-top:6px">Studio time (Eastern).</p><button class="link-btn" data-when="now" style="justify-content:flex-start;margin-top:0">Post it right away instead</button></div>' : '') +
+
       '<div class="group">' + toggle('needsRead', d.needsRead, 'Needs to be marked read', 'People tap "Mark as read" and you can see who has.') + '</div>' +
       (d.needsRead ? '<label class="lbl" for="f-readby">Read by <span class="opt">optional</span></label><input class="input" type="date" id="f-readby" data-f="readBy" min="' + today + '" value="' + esc(d.readBy) + '">' : '') +
 
@@ -1109,7 +1114,7 @@
 
   function renderReaders() {
     var p = byId(state.postId), r = state.readers;
-    var top = '<div class="screen post-screen"><div class="post-top"><button class="back" data-back="1" aria-label="Back">' + icon('chevron-left') + '</button>' +
+    var top = '<div class="screen post-screen"><div class="post-top"><span class="back-spacer"></span>' +
       '<div class="compose-head">Who has read</div><span class="back-spacer"></span></div>' +
       '<p class="readers-title">' + esc(p ? p.title : '') + '</p>';
     if (!r) return top + '<div class="sk" style="height:86px;border-radius:20px;margin-top:16px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:26px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:10px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:10px"></div></div>';
@@ -1176,7 +1181,7 @@
 
   function mySettings() {
     var me = state.me;
-    return '<h2 class="section-label"' + (state.canPost || state.me.role === 'admin' ? '' : ' style="margin-top:4px"') + '>Text size on this phone</h2>' + textSizeControl() +
+    return '<h2 class="section-label"' + (hasTools() ? '' : ' style="margin-top:4px"') + '>Text size on this phone</h2>' + textSizeControl() +
       '<p class="fine" style="margin-top:10px">Makes everything in the app bigger. It only changes this phone.</p>' +
       '<h2 class="section-label">Keep the app handy</h2><div class="card"><p><b>iPhone:</b> open your link in Safari, tap the Share button, then "Add to Home Screen."</p>' +
       '<p style="margin-top:10px"><b>Android:</b> open it in Chrome, tap the three dots, then "Add to Home screen."</p></div>' +
@@ -1188,16 +1193,20 @@
 
   function renderTeam() {
     var t = state.team;
+    var isAdmin = state.me.role === 'admin' && hasTools();
+    if (!isAdmin) state.setTab = 'me';
     var head = '<div class="screen"><h1 class="page-title">Settings</h1>';
-    if (state.canPost || state.me.role === 'admin') head += '<h2 class="section-label" style="margin-top:4px">Edit mode</h2><div class="group" style="margin-top:0">' +
-      toggle('edit', editing(), 'Show editing tools', 'Turns on New post, pencils, drafts, and read counts. Off shows the app the way the team sees it.').replace('data-toggle="edit"', 'data-editmode="1"') + '</div>';
-    head += mySettings();
-    if (state.me.role !== 'admin') return head + '</div>';
-    head += '<h1 class="page-title sub-title">Team</h1>';
-    if (!t) { loadTeam(); return head + '<div class="sk" style="height:56px;border-radius:16px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:26px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:10px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:10px"></div></div>'; }
+    if (isAdmin) head += '<div class="seg-group set-tabs"><button class="seg-btn' + (state.setTab !== 'team' ? ' on' : '') + '" data-settab="me">My settings</button><button class="seg-btn' + (state.setTab === 'team' ? ' on' : '') + '" data-settab="team">Team</button></div>';
+    if (state.setTab !== 'team') {
+      if (hasTools()) head += '<h2 class="section-label"' + (isAdmin ? '' : ' style="margin-top:4px"') + '>Edit mode</h2><div class="group" style="margin-top:0">' +
+        toggle('edit', editing(), 'Show editing tools', 'Turns on New post, pencils, drafts, and read counts. Off shows the app the way the team sees it.').replace('data-toggle="edit"', 'data-editmode="1"') + '</div>';
+      return head + mySettings() + '</div>';
+    }
+    if (!t) { loadTeam(); return head + '<div class="sk" style="height:56px;border-radius:16px;margin-top:22px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:26px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:10px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:10px"></div></div>'; }
     if (t.error) return head + '<div class="empty"><div class="bubble sm coral">' + icon('wifi-off') + '</div><div class="calm-title">' + esc(t.error) + '</div><button class="btn btn-outline sm" data-teamreload="1">Try again</button></div></div>';
+    head += '<div style="height:22px"></div>';
     function row(x) {
-      var tags = (x.role !== 'member' ? '<span class="badge">' + ROLE_WORDS[x.role] + '</span>' : '') + (x.apprentice ? '<span class="badge soft">Apprentice</span>' : '');
+      var tags = (x.role !== 'member' ? '<span class="badge">' + ROLE_WORDS[x.role] + '</span>' : '') + (x.apprentice ? '<span class="badge soft">Apprentice</span>' : '') + (x.tools ? '<span class="badge soft">Can edit</span>' : '');
       return '<button class="person-row tap" data-person-open="' + esc(x.id) + '"><span class="person-row-text"><span class="person-name">' + esc(x.name) + tags + '</span>' +
         '<span class="person-sub">' + (x.deactivated ? 'Deactivated. Link is off.' : x.lastVisit ? 'Last in the app ' + esc(whenText(x.lastVisit)) : 'Hasn\'t opened the app yet') + '</span></span>' + icon('chevron-right') + '</button>';
     }
@@ -1210,7 +1219,7 @@
       '<h2 class="section-label">On the team <span class="n">' + on.length + '</span></h2><div class="rows-list">' + on.map(row).join('') + '</div>' +
       (off.length ? '<h2 class="section-label">Deactivated <span class="n">' + off.length + '</span></h2><div class="rows-list">' + off.map(row).join('') + '</div>' : '') +
       '<h2 class="section-label">App settings</h2>' +
-      '<div class="group" style="margin-top:0">' + toggle('beta', state.settings.beta, 'Show the Beta tag', 'The small tag beside VILLAGE WEST on Home.').replace('data-toggle="beta"', 'data-setting="Beta"') + '</div>' +
+      '<div class="group" style="margin-top:0">' + toggle('beta', state.settings.beta, 'Show the Beta tag', 'The small tag above the logo on Home.').replace('data-toggle="beta"', 'data-setting="Beta"') + '</div>' +
       emailControl(t) +
       '<h2 class="section-label">Categories</h2><div class="rows-list">' + cats + '</div>' +
       '<button class="link-btn" data-cat-open="">' + icon('plus') + 'Add a category</button>' +
@@ -1240,6 +1249,7 @@
     var me = x.id === state.me.id, link = linkFor(x);
     sheet('<h2>' + esc(x.name) + '</h2><p>' + esc(x.email) + '</p>' +
       '<div class="sum"><span>Role</span><b>' + ROLE_WORDS[x.role] + (x.apprentice ? ', Apprentice' : '') + '</b></div>' +
+      (x.role !== 'member' ? '<div class="sum"><span>Editing tools</span><b>' + (x.tools ? 'On' : 'Off') + '</b></div>' : '') +
       '<div class="sum"><span>Last in the app</span><b>' + (x.lastVisit ? esc(whenText(x.lastVisit)) : 'Not yet') + '</b></div>' +
       '<div class="sum"><span>Link emailed</span><b>' + (x.linkSentAt ? esc(whenText(x.linkSentAt)) : 'Not yet') + '</b></div>' +
       (x.deactivated
@@ -1247,7 +1257,7 @@
         : (note ? '<p class="note">' + esc(note) + '</p>' : '') +
           '<div class="linkbox">' + esc(link.replace(/^https?:\/\//, '')) + '</div>' +
           '<button class="btn btn-primary" data-sheet="copy" data-arg="' + esc(x.id) + '">' + icon('copy') + 'Copy link</button>' +
-          '<button class="btn btn-outline" data-sheet="emaillink" data-arg="' + esc(x.id) + '">' + icon('mail') + 'Email it</button>' +
+          '<button class="btn btn-outline" data-sheet="emaillink" data-arg="' + esc(x.id) + '">' + icon('mail') + (state.team && state.team.emailMode === 'test' ? 'Email it (test, goes to you)' : state.team && state.team.emailMode === 'off' ? 'Email it (email is off)' : 'Email it') + '</button>' +
           '<div class="sheet-links"><button data-sheet="editperson" data-arg="' + esc(x.id) + '">Edit details</button><button data-sheet="asknewlink" data-arg="' + esc(x.id) + '">New link</button>' +
           (me ? '' : '<button class="red" data-sheet="askdeactivate" data-arg="' + esc(x.id) + '">Deactivate</button>') + '</div>') +
       '<button class="btn btn-ghost" data-sheet="close">Done</button>');
@@ -1255,7 +1265,7 @@
 
   function personForm(id) {
     var x = id ? person(id) : null;
-    state.personForm = { id: id || '', role: x ? x.role : 'member', apprentice: x ? x.apprentice : false };
+    state.personForm = { id: id || '', role: x ? x.role : 'member', apprentice: x ? x.apprentice : false, tools: x ? !!x.tools : false };
     var f = state.personForm;
     sheet('<h2>' + (x ? 'Edit details' : 'Add team member') + '</h2>' +
       '<label class="lbl" for="pf-name" style="margin-top:6px">Name</label><input class="input" id="pf-name" autocomplete="off" placeholder="First and last name" value="' + esc(x ? x.name : '') + '">' +
@@ -1263,7 +1273,8 @@
       '<div class="lbl">Role</div><div class="seg-group" id="pf-role">' + ['member', 'poster', 'admin'].map(function (r) {
         return '<button class="seg-btn' + (f.role === r ? ' on' : '') + '" data-prole="' + r + '">' + ROLE_WORDS[r] + '</button>'; }).join('') + '</div>' +
       '<p class="fine" id="pf-rolehint" style="margin-top:8px">' + roleHint(f.role) + '</p>' +
-      '<div class="group" style="margin-top:14px"><button class="switch-row" role="switch" aria-checked="' + f.apprentice + '" data-papp="1"><span class="switch-text"><span class="switch-label">In the Apprentices group</span></span><span class="switch' + (f.apprentice ? ' on' : '') + '"><span></span></span></button></div>' +
+      '<div class="group" style="margin-top:14px"><button class="switch-row" role="switch" aria-checked="' + f.apprentice + '" data-papp="1"><span class="switch-text"><span class="switch-label">In the Apprentices group</span></span><span class="switch' + (f.apprentice ? ' on' : '') + '"><span></span></span></button>' +
+      '<button class="switch-row" role="switch" aria-checked="' + f.tools + '" data-ptools="1"><span class="switch-text"><span class="switch-label">Editing tools</span><span class="switch-hint">Lets an Admin or Poster post and edit. Without it they only read.</span></span><span class="switch' + (f.tools ? ' on' : '') + '"><span></span></span></button></div>' +
       '<button class="btn btn-primary" data-sheet="saveperson" style="margin-top:14px">' + (x ? 'Save' : 'Add and create their link') + '</button><button class="btn btn-ghost" data-sheet="' + (x ? 'backtoperson' : 'close') + '" data-arg="' + esc(id || '') + '">Cancel</button>');
   }
   function roleHint(r) {
@@ -1336,7 +1347,7 @@
       var f = state.personForm, name = document.getElementById('pf-name').value, email = document.getElementById('pf-email').value;
       if (name.trim().length < 2) { toast('Add their name'); return true; }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { toast('That email doesn\'t look right'); return true; }
-      teamCall('savePerson', { person: { id: f.id, name: name, email: email, role: f.role, apprentice: f.apprentice } }, function (res) {
+      teamCall('savePerson', { person: { id: f.id, name: name, email: email, role: f.role, apprentice: f.apprentice, tools: f.tools } }, function (res) {
         personSheet(res.personId, res.added ? 'Added. Copy their link and send it to them.' : 'Saved.');
       });
       return true;
@@ -1356,8 +1367,14 @@
   }
 
   function stage4Click(e) {
-    var t = e.target.closest('[data-editmode],[data-size],[data-emailmode],[data-res-edit],[data-res-add],[data-res-clear],[data-rsec],[data-raud],[data-readers],[data-nudge],[data-person-open],[data-person-add],[data-cat-open],[data-setting],[data-teamreload],[data-prole],[data-papp],[data-swatch]');
+    var t = e.target.closest('[data-settab],[data-ptools],[data-editmode],[data-size],[data-emailmode],[data-res-edit],[data-res-add],[data-res-clear],[data-rsec],[data-raud],[data-readers],[data-nudge],[data-person-open],[data-person-add],[data-cat-open],[data-setting],[data-teamreload],[data-prole],[data-papp],[data-swatch]');
     if (!t) return false;
+    if (t.hasAttribute('data-settab')) { state.setTab = t.getAttribute('data-settab'); if (state.setTab === 'team') state.team = null; render(); window.scrollTo(0, 0); return true; }
+    if (t.hasAttribute('data-ptools')) {
+      state.personForm.tools = !state.personForm.tools;
+      t.setAttribute('aria-checked', state.personForm.tools); t.querySelector('.switch').classList.toggle('on', state.personForm.tools);
+      return true;
+    }
     if (t.hasAttribute('data-editmode')) {
       var turnOn = !editing(); lsSet(EDIT_KEY, turnOn ? '1' : '');
       var yy = window.scrollY; render(); window.scrollTo(0, yy);

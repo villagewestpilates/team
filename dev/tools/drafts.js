@@ -41,13 +41,13 @@ const base0 = { categoryId: 'c', pinned: false, needsRead: true, readBy: '', eve
   const onPost = async () => !!(await page.$('.post-title'));
   const toast = () => page.textContent('#toast');
 
-  await page.goto(base + '?k=' + 'k'.repeat(30)); await page.waitForSelector('.todo');
+  await page.goto(base + '?k=' + 'k'.repeat(30)); await page.waitForSelector('.post-card');
   // --- Swipe ---
   await page.tap('.post-card .card-title'); await page.waitForSelector('.post-title'); await page.waitForTimeout(1200);
   check('first post shows the swipe tip once', (await toast()) === 'Tip: swipe sideways to go back');
   await swipe(120, 400, 320, 410);
-  check('swipe right goes back to Home', !(await onPost()) && !!(await page.$('.todo')));
-  check('swiping back did not mark it read', (await page.textContent('.todo-count')) === '1 post to read' && !sent.length);
+  check('swipe right goes back to Home', !(await onPost()) && !!(await page.$('.post-card')));
+  check('swiping back did not mark it read', !!(await page.$('.post-card .pill-coral')) && !sent.length);
   await page.tap('.post-card .card-title'); await page.waitForSelector('.post-title'); await page.waitForTimeout(300);
   await swipe(320, 400, 110, 395);
   check('swipe left also goes back', !(await onPost()));
@@ -58,7 +58,7 @@ const base0 = { categoryId: 'c', pinned: false, needsRead: true, readBy: '', eve
   check('a short sideways nudge does not go back', await onPost());
   await swipe(5, 400, 250, 400);
   check('the very edge is left to the phone', await onPost());
-  await page.tap('.bar-back'); await page.waitForSelector('.todo'); check('bottom Back button still works', true);
+  await page.tap('.bar-back'); await page.waitForSelector('.post-card'); check('bottom Back button still works', true);
 
   // --- Drafts ---
   await page.tap('.fab'); await page.waitForSelector('#f-title');
@@ -76,8 +76,9 @@ const base0 = { categoryId: 'c', pinned: false, needsRead: true, readBy: '', eve
   check('tapping a draft opens it for editing', (await page.inputValue('#f-title')) === 'Winter schedule changes' && !!(await page.$('[data-savedraft]')));
   // --- Schedule it ---
   await page.fill('#f-body', 'New hours start in January.');
-  await page.tap('[data-when="later"]'); await page.waitForSelector('#f-when');
-  check('choosing Later shows a date and time, and keeps the text', (await page.inputValue('#f-body')).startsWith('New hours') && (await page.textContent('[data-submit]')) === 'Review and schedule');
+  check('the form has no scheduling section until you ask for it', !(await page.$('#f-when')) && !(await page.$('[data-when]')));
+  await page.tap('[data-submit]'); await page.waitForSelector('.sheet'); await page.tap('[data-sheet="picklater"]'); await page.waitForSelector('#f-when');
+  check('choosing Schedule for later shows a date and time, and keeps the text', (await page.inputValue('#f-body')).startsWith('New hours') && (await page.textContent('[data-submit]')) === 'Review and schedule');
   await page.fill('#f-when', '2020-01-01T09:00'); await page.tap('[data-submit]'); await page.waitForTimeout(250);
   check('a past time is caught', (await toast()) === 'Pick a date and time in the future');
   await page.fill('#f-when', '2027-01-04T06:00'); await shot('03-schedule-form');
@@ -99,12 +100,12 @@ const base0 = { categoryId: 'c', pinned: false, needsRead: true, readBy: '', eve
   check('review shows the category and offers Schedule for later', (await page.textContent('.sheet')).includes('CategoryAnnouncements') && !!(await page.$('[data-sheet=\"picklater\"]')));
   await page.screenshot({ path: require('path').join(OUT, '06-review-with-schedule.png') });
   await page.tap('[data-sheet=\"picklater\"]'); await page.waitForSelector('#f-when'); await page.waitForTimeout(300);
-  check('Schedule for later jumps to the date and time, text kept', (await page.inputValue('#f-title')) === 'From review' && !!(await page.$('[data-when=\"later\"].on')) && (await page.textContent('[data-submit]')) === 'Review and schedule');
+  check('Schedule for later jumps to the date and time, text kept', (await page.inputValue('#f-title')) === 'From review' && !!(await page.$('#f-when')) && (await page.textContent('[data-submit]')) === 'Review and schedule');
   await page.tap('[data-back]'); await page.waitForSelector('.todo, .calm, #search'); await page.evaluate(() => localStorage.removeItem('vwp.draft'));
   await page.tap('[data-tab=\"bulletins\"]'); await page.waitForSelector('.pending-row');
   // --- Post a scheduled one now ---
   await page.tap('.pending-row'); await page.waitForSelector('#f-title');
-  check('scheduled post reopens with Later selected', !!(await page.$('[data-when="later"].on')) && (await page.inputValue('#f-when')) === '2027-01-04T06:00');
+  check('scheduled post reopens showing its time', (await page.inputValue('#f-when')) === '2027-01-04T06:00');
   await page.tap('[data-when="now"]'); await page.tap('[data-submit]'); await page.waitForSelector('.sheet'); await page.tap('[data-sheet="post"]'); await page.waitForSelector('.post-title'); await page.waitForTimeout(300);
   check('posting now makes it live', sent[sent.length - 1].post.publishAt === '' && (await toast()) === 'Posted' && !(await page.$('.sched-note')));
   check('no script errors', errors.length === 0, errors.join(' | '));

@@ -91,8 +91,9 @@ function world() {
   await pg.goto(base + '?k=' + w.team[0].token + '#/home'); await pg.waitForSelector('.post-card');
 
   // Team screen
-  await pg.click('[data-tab="team"]'); await pg.waitForSelector('[data-person-add]'); await pg.waitForTimeout(300);
+  await pg.click('[data-tab="team"]'); await pg.click('[data-settab="team"]'); await pg.waitForSelector('[data-person-add]'); await pg.waitForTimeout(300);
   check('team list shows 5 people', (await pg.$$('[data-person-open]')).length === 5);
+  check('Settings has My settings and Team buttons for an admin', (await pg.$$('.set-tabs .seg-btn')).length === 2 && (await pg.textContent('.set-tabs .seg-btn.on')) === 'Team');
   await shot(pg, '04-team'); await pg.screenshot({ path: path.join(OUT, '04-team-full.png'), fullPage: true });
   await pg.click('[data-person-open="p3"]'); await pg.waitForSelector('.linkbox'); await pg.waitForTimeout(250);
   const link0 = await pg.textContent('.linkbox'); await shot(pg, '05-person-sheet');
@@ -119,17 +120,18 @@ function world() {
   await pg.fill('#pf-name', 'Jordan Rivers'); await pg.fill('#pf-email', 'not-an-email'); await pg.click('[data-sheet="saveperson"]'); await pg.waitForTimeout(200);
   check('add: bad email caught', (await toast(pg)) === 'That email doesn\'t look right');
   await pg.fill('#pf-email', 'jordan@example.com'); await pg.click('[data-prole="poster"]'); await pg.click('[data-papp]');
+  await pg.click('[data-ptools]');
   check('typed text survives picking a role', (await pg.inputValue('#pf-name')) === 'Jordan Rivers');
   await pg.click('[data-sheet="saveperson"]'); await pg.waitForSelector('.note'); await pg.waitForTimeout(250);
   const added = s.sent.filter(r => r.action === 'savePerson').pop().person;
-  check('add: sent with role and group', added.role === 'poster' && added.apprentice === true && !added.id);
+  check('add: sent with role, group, and editing tools', added.role === 'poster' && added.apprentice === true && added.tools === true && !added.id);
   check('add: shows the new link to copy', (await pg.textContent('.linkbox')).includes('new') && (await pg.textContent('.note')).startsWith('Added'));
   await shot(pg, '08-added'); await pg.click('[data-sheet="close"]');
   check('new person is on the list', (await pg.$$('[data-person-open]')).length === 6);
   // Settings
   await pg.click('[data-setting="Beta"]'); await pg.waitForTimeout(500);
   await pg.click('[data-tab="home"]'); await pg.waitForSelector('.hello'); check('Beta switch hides the tag', !(await pg.$('.beta')));
-  await pg.click('[data-tab="team"]'); await pg.waitForSelector('[data-cat-open]');
+  await pg.click('[data-tab="team"]'); await pg.click('[data-settab="team"]'); await pg.waitForSelector('[data-cat-open]');
   await pg.click('[data-cat-open=""]'); await pg.waitForSelector('#cf-name'); await pg.fill('#cf-name', 'Retail'); await pg.click('[data-swatch="#C9432F"]'); await pg.waitForTimeout(150); await shot(pg, '09-category');
   await pg.click('[data-sheet="savecat"]'); await pg.waitForTimeout(500);
   await pg.click('[data-cat-open="cat_policies"]'); await pg.waitForSelector('#cf-name'); await pg.fill('#cf-name', 'Policies & Safety'); await pg.click('[data-sheet="savecat"]'); await pg.waitForTimeout(500);

@@ -21,7 +21,7 @@ function makeWorld() {
   ctx.voidReads_ = postId => tables.Reads.forEach(r => { if (r.PostId === postId) r.Voided = true; });
   ctx.savePhoto_ = () => {}; ctx.clearPhoto_ = () => {}; ctx.photoRows_ = () => [];
   ctx.setting_ = key => (tables.Settings.find(r => r.Key === key) || {}).Value || '';
-  const person = (name, role, apprentice, extra) => { const p = Object.assign({ PersonId: 'p_' + name.toLowerCase(), Name: name + ' Test', FirstName: name, Email: name.toLowerCase() + '@example.com', Role: role, Apprentice: apprentice, Token: (name + 'token').padEnd(32, 'k'), Deactivated: false, CreatedAt: new Date(), LinkSentAt: '', IsTest: false }, extra || {}); tables.Team.push(p); return p; };
+  const person = (name, role, apprentice, extra) => { const p = Object.assign({ PersonId: 'p_' + name.toLowerCase(), Name: name + ' Test', FirstName: name, Email: name.toLowerCase() + '@example.com', Role: role, Apprentice: apprentice, Token: (name + 'token').padEnd(32, 'k'), Deactivated: false, CreatedAt: new Date(), LinkSentAt: '', IsTest: false, EditTools: role !== 'member' }, extra || {}); tables.Team.push(p); return p; };
   tables.Categories.push({ CategoryId: 'cat_announcements', Name: 'Announcements', Color: '#3F5FC0', SortOrder: 1, Archived: false });
   tables.Settings.push({ Key: 'Beta', Value: true }, { Key: 'DefaultCategory', Value: 'cat_announcements' }, { Key: 'EmailMode', Value: 'off' });
   const call = (who, body) => vm.runInContext('route_', ctx)(Object.assign({ k: who.Token }, body));
@@ -109,6 +109,22 @@ w.tables.Resources.push({ ResourceId: 'r1', Title: 'Open', Url: 'https://a.co', 
 const res = who => w.call(who, { action: 'boot', quiet: true }).resources.map(x => x.id).join();
 check('resources by audience, blank links hidden from the team', res(molly) === 'r1' && res(ash) === 'r1,r3' && res(chris) === 'r1' && res(adam) === 'r1,r2,r3,r4', [res(molly), res(ash), res(chris), res(adam)].join(' | '));
 check('nudge and email link send nothing while email is off', w.call(adam, { action: 'nudge', postId: appId, ids: [ash.PersonId] }).code === 'email_off' && w.call(adam, { action: 'emailLink', id: ash.PersonId }).code === 'email_off');
+
+// Editing tools are separate from role
+const cole = w.person('Cole', 'admin', false, { EditTools: false });
+w.tables.Resources.push({ ResourceId: 'r5', Title: 'Admin doc', Url: 'https://d.co', Section: 'B', Audience: 'admins', SortOrder: 5, Archived: false });
+let bc = w.call(cole, { action: 'boot', quiet: true });
+check('admin without editing tools: still sees admin resources and every live post', bc.ok && bc.me.tools === false && bc.resources.some(r => r.id === 'r5') && bc.posts.some(p => p.id === appId));
+check('...but gets no unfinished resources, no counts, no edit rights, cannot post', !bc.resources.some(r => r.id === 'r2') && bc.canPost === false && bc.posts.every(p => !p.canEdit && p.stats === undefined) && bc.people.length === 0);
+check('...and the server refuses if they try anyway', w.call(cole, { action: 'savePost', post: Object.assign({ title: 'x' }, base) }).code === 'forbidden' && w.call(cole, { action: 'team' }).code === 'forbidden' && w.call(cole, { action: 'archivePost', postId: appId }).code === 'forbidden' && w.call(cole, { action: 'saveResource', resource: { title: 'x', section: 'y' } }).code === 'forbidden' && w.call(cole, { action: 'readers', postId: appId }).code === 'forbidden');
+r = w.call(chris, { action: 'savePost', post: { title: 'Private draft', body: '', status: 'draft', audience: 'everyone', links: [] } });
+check('...and does not see other people\'s drafts', !w.call(cole, { action: 'boot', quiet: true }).posts.some(p => p.id === r.postId));
+r = w.call(adam, { action: 'savePerson', person: { id: cole.PersonId, name: 'Cole Test', email: 'cole@example.com', role: 'admin', tools: true } });
+check('an admin can switch someone\'s editing tools on', r.ok && w.call(cole, { action: 'boot', quiet: true }).me.tools === true && w.call(cole, { action: 'team' }).ok);
+r = w.call(adam, { action: 'savePerson', person: { id: adam.PersonId, name: 'Adam Test', email: 'adam@example.com', role: 'admin', tools: false } });
+check('nobody can switch off their own', r.ok && w.call(adam, { action: 'team' }).ok);
+r = w.call(adam, { action: 'savePerson', person: { id: molly.PersonId, name: 'Molly Test', email: 'molly@example.com', role: 'member', tools: true } });
+check('editing tools never apply to a Team member', w.call(molly, { action: 'boot', quiet: true }).me.tools === false && w.call(molly, { action: 'savePost', post: Object.assign({ title: 'x' }, base) }).code === 'forbidden');
 
 console.log(log.join('\n'));
 console.log('server pass=' + log.filter(l => l.startsWith('PASS')).length + ' fail=' + log.filter(l => l.startsWith('FAIL')).length);

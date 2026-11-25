@@ -524,3 +524,18 @@ body { background: var(--bg); }
 .done .bubble.pop { animation: pop 520ms cubic-bezier(.2, 1.6, .4, 1) both; }
 @keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .party { display: none; } }
+
+/* ---------- Audit fixes ---------- */
+.toast.low { top: auto; bottom: calc(var(--tab-h) + var(--safe-b) + 84px); transform: translate(-50%, 16px); }
+.toast.low.show { transform: translate(-50%, 0); }
+.row-pinline { display: flex; margin-bottom: 2px; }
+.pin-group .row-pinline, .pin-group .post-card .mini-pin { display: none; }
+.post-row .pill { padding: 5px 10px; font-size: 13px; }
+.post-row.is-unread { border-color: #EBC4BB; }
+.post-row.is-unread .post-row-title { font-weight: 700; }
+.post-top-gap { height: 10px; }
+.set-tabs { margin-bottom: 4px; }
+.set-tabs .seg-btn { flex: 1; }
+.sched-box { margin-top: 22px; background: var(--green-soft); border-radius: 18px; padding: 16px; }
+.sched-box .lbl { display: flex; align-items: center; gap: 6px; color: var(--green); }
+.sched-box .lbl svg.ic { width: 16px; height: 16px; }
