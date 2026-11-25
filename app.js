@@ -105,7 +105,7 @@
   }
   /** Posted since this person last opened the app, and not written by them. */
   function isNew(p) { return !!state.lastSeen && !p.mine && !p.readAt && p.createdAt > state.lastSeen; }
-  function isUnread(p) { return p.needsRead && p.forMe && !p.readAt; }
+  function isUnread(p) { return p.needsRead && p.forMe && !p.readAt && !p.status; }
   function newestFirst(a, b) { return a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0; }
   function pinnedThenNewest(a, b) { return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || newestFirst(a, b); }
   /** Reading order: earliest read-by date first, then pinned, then oldest so news is read in order. */
@@ -245,8 +245,8 @@
 
   function renderHome() {
     var unread = unreadQueue();
-    var read = state.posts.filter(function (p) { return p.readAt; }).sort(function (a, b) { return a.readAt < b.readAt ? 1 : -1; });
-    var fyi = state.posts.filter(function (p) { return !p.readAt && !isUnread(p); }).sort(pinnedThenNewest);
+    var read = state.posts.filter(function (p) { return p.readAt && !p.status; }).sort(function (a, b) { return a.readAt < b.readAt ? 1 : -1; });
+    var fyi = state.posts.filter(function (p) { return !p.readAt && !isUnread(p) && !p.status; }).sort(pinnedThenNewest);
     var html = '<div class="screen">' + header();
 
     if (unread.length) {
@@ -267,6 +267,8 @@
         '<div class="calm-sub">Nothing new to read right now.</div></div></section>';
     }
 
+    var waiting = pendingPosts().length;
+    if (waiting) html += '<button class="link-btn pending-link" data-tab="bulletins">' + icon('pencil') + waiting + (waiting === 1 ? ' draft or scheduled post' : ' drafts and scheduled posts') + icon('chevron-right') + '</button>';
     if (fyi.length) {
       html += '<h2 class="section-label">Good to know</h2><div class="rows-list">' +
         fyi.slice(0, 5).map(function (p) { return compactRow(p); }).join('') + '</div>';
@@ -284,6 +286,7 @@
   function bulletinList() {
     var q = state.search.trim().toLowerCase();
     var list = state.posts.filter(function (p) {
+      if (p.status) return false;
       if (state.filter === 'unread' && !isUnread(p)) return false;
       if (state.filter !== 'all' && state.filter !== 'unread' && p.categoryId !== state.filter) return false;
       if (q && (p.title + ' ' + p.body + ' ' + p.author + ' ' + cat(p.categoryId).name).toLowerCase().indexOf(q) === -1) return false;
@@ -313,6 +316,20 @@
     }).join('');
   }
 
+  function pendingPosts() {
+    return state.posts.filter(function (p) { return p.status && p.canEdit; }).sort(function (a, b) { return (a.savedAt || '') < (b.savedAt || '') ? 1 : -1; });
+  }
+  function whenFull(iso) { return fullDate(iso) + ' at ' + fmt(iso, { hour: 'numeric', minute: '2-digit' }); }
+  function pendingSection() {
+    var list = pendingPosts();
+    if (!list.length) return '';
+    return '<h2 class="section-label" style="margin-top:6px">Drafts and scheduled</h2><div class="rows-list" style="margin-bottom:8px">' + list.map(function (p) {
+      var sub = p.status === 'draft' ? 'Draft, saved ' + whenFull(p.savedAt) : 'Goes out ' + whenFull(p.publishAt);
+      return '<button class="post-row pending-row" data-edit="' + esc(p.id) + '"><span class="pending-ic">' + icon(p.status === 'draft' ? 'pencil' : 'clock') + '</span>' +
+        '<span class="post-row-text"><span class="post-row-title">' + esc(p.title || 'Untitled') + '</span><span class="post-row-sub">' + esc(sub) + '</span></span>' + icon('chevron-right') + '</button>';
+    }).join('') + '</div>';
+  }
+
   function renderBulletins() {
     return '<div class="screen">' +
       '<h1 class="page-title">Bulletins</h1>' +
@@ -320,6 +337,7 @@
         '<input id="search" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" placeholder="Search posts" aria-label="Search posts" value="' + esc(state.search) + '">' +
       '</label>' +
       '<div class="chips" id="chips">' + chips() + '</div>' +
+      pendingSection() +
       '<div id="list">' + bulletinList() + '</div>' +
     '</div>';
   }
@@ -362,6 +380,7 @@
       '<div class="post-top"><button class="back" data-back="1" aria-label="Back">' + icon('chevron-left') + '</button>' + progress +
         (p.canEdit ? '<button class="back" data-edit="' + esc(p.id) + '" aria-label="Edit this post">' + icon('pencil') + '</button>' : '<span class="back-spacer"></span>') + '</div>' +
       '<div class="card-top">' + catTag(p) + (unread || p.readAt ? statusPill(p) : '') + '</div>' +
+      (p.status ? '<div class="sched-note">' + icon(p.status === 'draft' ? 'pencil' : 'clock') + (p.status === 'draft' ? 'Draft. Only you and admins can see it.' : 'Goes out ' + esc(whenFull(p.publishAt)) + '. Only you and admins can see it until then.') + '</div>' : '') +
       '<h1 class="post-title">' + esc(p.title) + '</h1>' +
       '<div class="meta">' + metaLine(p) + '</div>' + extras(p) +
       (p.stats && p.needsRead ? '<button class="stats" data-readers="' + esc(p.id) + '">' + icon('users') + p.stats.read + ' of ' + p.stats.total + ' read' + icon('chevron-right') + '</button>' : '') +
@@ -472,6 +491,7 @@
     render(opts.anim || 'slide');
     window.scrollTo(0, 0);
     api('viewPost', { postId: id }).catch(function () {});
+    if (!lsGet('vwp.swipetip') && 'ontouchstart' in window) { lsSet('vwp.swipetip', '1'); setTimeout(function () { if (state.view === 'post') toast('Tip: swipe sideways to go back'); }, 900); }
   }
 
   function showDone() {
@@ -593,7 +613,7 @@
     return { id: '', title: '', body: '', categoryId: state.defaultCategory || (state.categories[0] || {}).id || '',
       pinned: false, needsRead: true, readBy: '', audience: 'everyone', audienceIds: [], buttonText: '',
       links: [{ label: '', url: '' }, { label: '', url: '' }], eventDate: '', skipEmail: false,
-      photo: null, hasPhoto: false, removePhoto: false, more: false, dirty: false, authorId: state.me.id };
+      photo: null, hasPhoto: false, removePhoto: false, more: false, dirty: false, authorId: state.me.id, when: 'now', publishLocal: '', wasStatus: '' };
   }
   function saveDraft() {
     var d = state.draft;
@@ -613,6 +633,8 @@
         needsRead: p.needsRead, readBy: p.readBy, audience: p.audience || 'everyone', audienceIds: (p.audienceIds || []).slice(),
         buttonText: p.buttonText, eventDate: p.eventDate, skipEmail: !!p.skipEmail, hasPhoto: !!p.photo, authorId: p.authorId || state.me.id });
       (p.links || []).forEach(function (l, i) { if (i < 2) d.links[i] = { label: l.label, url: l.url }; });
+      d.wasStatus = p.status || '';
+      if (p.status === 'scheduled') { d.when = 'later'; d.publishLocal = localInput(p.publishAt); }
       d.more = !!(d.buttonText || d.links[0].url || d.pinned || d.skipEmail || d.authorId !== state.me.id);
     } else {
       try { var saved = JSON.parse(lsGet(DRAFT_KEY) || 'null'); if (saved && (saved.title || saved.body)) { d = Object.assign(d, saved); d.restored = true; } } catch (e) {}
@@ -623,6 +645,29 @@
     window.scrollTo(0, 0);
     if (d.restored) { d.restored = false; toast('We kept your draft from last time'); }
   }
+
+  /** Studio wall-clock time (Eastern) for a date and time box, as YYYY-MM-DDTHH:mm. */
+  function studioClock(d) {
+    var o = {};
+    new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(d).forEach(function (x) { o[x.type] = x.value; });
+    return o.year + '-' + o.month + '-' + o.day + 'T' + (o.hour === '24' ? '00' : o.hour) + ':' + o.minute;
+  }
+  function clockMs(str) {
+    var m = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)/.exec(str || '');
+    return m ? Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5]) : NaN;
+  }
+  /** Turns a studio wall-clock time into an exact moment, allowing for daylight saving. */
+  function studioToIso(str) {
+    var want = clockMs(str);
+    if (isNaN(want)) return '';
+    var guess = want;
+    for (var i = 0; i < 3; i++) guess += want - clockMs(studioClock(new Date(guess)));
+    return new Date(guess).toISOString();
+  }
+  window.__vwpTest = studioToIso;
+  function localInput(iso) { return studioClock(iso ? new Date(iso) : new Date(Date.now() + 3600000)); }
+  function notOutYet(d) { return !d.id || !!d.wasStatus; }
 
   function leaveCompose() {
     var d = state.draft;
@@ -716,6 +761,9 @@
 
       '<div class="lbl">Who sees it</div><div class="seg-group">' + auds + '</div>' + people +
 
+      (notOutYet(d) ? '<div class="lbl">When it goes out</div><div class="seg-group">' +
+        '<button class="seg-btn' + (d.when !== 'later' ? ' on' : '') + '" data-when="now">Now</button><button class="seg-btn' + (d.when === 'later' ? ' on' : '') + '" data-when="later">Later</button></div>' +
+        (d.when === 'later' ? '<input class="input" type="datetime-local" id="f-when" data-f="publishLocal" min="' + localInput(new Date().toISOString()) + '" value="' + esc(d.publishLocal) + '" aria-label="Date and time to post" style="margin-top:8px"><p class="fine" style="margin-top:6px">Studio time (Eastern).</p>' : '') : '') +
       '<div class="group">' + toggle('needsRead', d.needsRead, 'Needs to be marked read', 'People tap "Mark as read" and you can see who has.') + '</div>' +
       (d.needsRead ? '<label class="lbl" for="f-readby">Read by <span class="opt">optional</span></label><input class="input" type="date" id="f-readby" data-f="readBy" min="' + today + '" value="' + esc(d.readBy) + '">' : '') +
 
@@ -728,7 +776,9 @@
         (editing ? '<button class="danger-link" data-archive="1">Remove this post</button>' : '') +
       '</div>' : '') +
     '</div>' +
-    '<div class="readbar"><div class="readbar-in"><button class="btn btn-primary" data-submit="1">' + (editing ? 'Save changes' : 'Review and post') + '</button></div></div>';
+    '<div class="readbar"><div class="readbar-in"><div class="readbar-row">' +
+      (notOutYet(d) ? '<button class="btn btn-outline draft-btn" data-savedraft="1">Save draft</button>' : '') +
+      '<button class="btn btn-primary" data-submit="1">' + (!notOutYet(d) ? 'Save changes' : d.when === 'later' ? 'Review and schedule' : 'Review and post') + '</button></div></div></div>';
   }
 
   function rerenderCompose() {
@@ -778,7 +828,7 @@
     if (sh) return sheetAction(sh.getAttribute('data-sheet'), sh.getAttribute('data-arg') || '');
     if (e.target.classList && e.target.classList.contains('sheet-wrap')) return closeSheet();
     if (stage4Click(e)) return;
-    var t = e.target.closest('[data-fmt],[data-author],[data-compose],[data-edit],[data-cat],[data-aud],[data-person],[data-toggle],[data-more],[data-addphoto],[data-rmphoto],[data-submit],[data-archive]');
+    var t = e.target.closest('[data-when],[data-savedraft],[data-fmt],[data-author],[data-compose],[data-edit],[data-cat],[data-aud],[data-person],[data-toggle],[data-more],[data-addphoto],[data-rmphoto],[data-submit],[data-archive]');
     if (!t) return;
     if (t.hasAttribute('data-compose')) return openCompose('');
     if (t.hasAttribute('data-edit')) return openCompose(t.getAttribute('data-edit'));
@@ -787,6 +837,8 @@
     if (t.hasAttribute('data-addphoto')) return document.getElementById('photo-input').click();
     if (t.hasAttribute('data-fmt')) return formatBody(t.getAttribute('data-fmt'));
     if (t.hasAttribute('data-submit')) return submitPost();
+    if (t.hasAttribute('data-savedraft')) return saveDraftToServer();
+    if (t.hasAttribute('data-when')) { d.when = t.getAttribute('data-when'); if (d.when === 'later' && !d.publishLocal) d.publishLocal = localInput(''); d.dirty = true; saveDraft(); return rerenderCompose(); }
     if (t.hasAttribute('data-archive')) {
       return sheet('<h2>Remove this post?</h2><p>It disappears from the app for everyone. The record stays in your Sheet.</p>' +
         '<button class="btn btn-danger" data-sheet="archive">Remove post</button><button class="btn btn-ghost" data-sheet="close">Keep it</button>');
@@ -838,13 +890,17 @@
       if (l.label.trim() && !l.url.trim()) { d.more = true; rerenderCompose(); return toast('Add the link for "' + l.label.trim() + '"'); }
       if (l.url.trim() && !/^(https?:\/\/|sms:|tel:|mailto:)\S+$/i.test(l.url.trim())) { d.more = true; rerenderCompose(); return toast('Links need to start with https://'); }
     }
+    var later = notOutYet(d) && d.when === 'later';
+    var whenIso = later ? studioToIso(d.publishLocal) : '';
+    if (later && (!whenIso || new Date(whenIso).getTime() < Date.now() + 120000)) { toast('Pick a date and time in the future'); return focusField('f-when'); }
     var who = audienceWords(d);
-    if (!d.id) {
-      var lines = '<div class="sum"><span>Goes to</span><b>' + esc(who) + '</b></div>' +
+    if (notOutYet(d)) {
+      var lines = '<div class="sum"><span>Goes out</span><b>' + (later ? esc(whenFull(whenIso)) : 'Now') + '</b></div>' +
+        '<div class="sum"><span>Goes to</span><b>' + esc(who) + '</b></div>' +
         '<div class="sum"><span>Mark as read</span><b>' + (d.needsRead ? (d.readBy ? 'Yes, by ' + fullDate(d.readBy) : 'Yes') : 'Not needed') + '</b></div>' +
         (d.needsRead ? '<div class="sum"><span>Email</span><b>' + (d.skipEmail ? 'Skipped' : 'Starts once email is switched on') + '</b></div>' : '');
-      return sheet('<h2>Ready to post?</h2><p class="sheet-title">' + esc(d.title.trim()) + '</p>' + lines +
-        '<button class="btn btn-primary" data-sheet="post">Post now</button><button class="btn btn-ghost" data-sheet="close">Keep editing</button>');
+      return sheet('<h2>' + (later ? 'Ready to schedule?' : 'Ready to post?') + '</h2><p class="sheet-title">' + esc(d.title.trim()) + '</p>' + lines +
+        '<button class="btn btn-primary" data-sheet="post">' + (later ? 'Schedule it' : 'Post now') + '</button><button class="btn btn-ghost" data-sheet="close">Keep editing</button>');
     }
     var p = byId(d.id);
     if (!d.needsRead || !(p && p.needsRead)) return sendPost('small');
@@ -854,16 +910,24 @@
       '<button class="btn btn-ghost" data-sheet="close">Keep editing</button>');
   }
 
+  function saveDraftToServer() {
+    var d = state.draft; if (!d) return;
+    if (!d.title.trim()) { toast('Give the draft a title first'); return focusField('f-title'); }
+    sendPost('', true);
+  }
+
   var sending = false;
-  function sendPost(change) {
+  function sendPost(change, asDraft) {
     if (sending) return;
     var d = state.draft; if (!d) return;
+    var later = !asDraft && notOutYet(d) && d.when === 'later';
+    if (asDraft) sheet('<div class="sheet-busy"></div>');
     sending = true;
     var box = document.querySelector('.sheet');
-    if (box) box.innerHTML = '<div class="sheet-busy"><div class="sk" style="width:48px;height:48px;border-radius:50%"></div><p>' + (d.id ? 'Saving' : 'Posting') + (d.photo ? ' and sending the photo' : '') + '</p></div>';
+    if (box) box.innerHTML = '<div class="sheet-busy"><div class="sk" style="width:48px;height:48px;border-radius:50%"></div><p>' + (asDraft ? 'Saving your draft' : later ? 'Scheduling' : d.id && !d.wasStatus ? 'Saving' : 'Posting') + (d.photo ? ' and sending the photo' : '') + '</p></div>';
     api('savePost', {
       change: change || '', removePhoto: !!d.removePhoto, photo: d.photo ? { data: d.photo.data, w: d.photo.w, h: d.photo.h } : null, thumb: d.photo ? d.photo.thumb : '',
-      post: { id: d.id, authorId: d.authorId, title: d.title, body: d.body, categoryId: d.categoryId, pinned: d.pinned, needsRead: d.needsRead,
+      post: { id: d.id, status: asDraft ? 'draft' : '', publishAt: later ? studioToIso(d.publishLocal) : '', authorId: d.authorId, title: d.title, body: d.body, categoryId: d.categoryId, pinned: d.pinned, needsRead: d.needsRead,
         readBy: d.readBy, audience: d.audience, audienceIds: d.audienceIds, buttonText: d.buttonText,
         links: d.links, eventDate: isPromo(d.categoryId) ? d.eventDate : '', skipEmail: d.skipEmail }
     }, 75000).then(function (res) {
@@ -875,10 +939,16 @@
       if (!d.id) lsSet(DRAFT_KEY, '');
       state.draft = null; state.flow = null;
       saveLocalSnapshot();
+      if (res.status) { // a draft or a scheduled post is not out yet, so go to the list where it waits
+        goTab('bulletins', false);
+        var made = byId(res.postId);
+        toast(res.status === 'draft' ? 'Draft saved' : 'Scheduled for ' + (made ? whenFull(made.publishAt) : 'later'));
+        return;
+      }
       state.view = 'post'; state.postId = res.postId;
       replaceRoute('#/post/' + res.postId);
       render('fade'); window.scrollTo(0, 0);
-      toast(res.isNew ? 'Posted' : res.real ? 'Saved. Everyone will be asked to read it again.' : 'Saved');
+      toast(res.isNew || d.wasStatus ? 'Posted' : res.real ? 'Saved. Everyone will be asked to read it again.' : 'Saved');
     }).catch(function () {
       sending = false; closeSheet();
       toast('That didn\'t send. Check your connection and try again. Your post is still here.');
@@ -1293,7 +1363,7 @@
     if (t.hasAttribute('data-tab')) return goTab(t.getAttribute('data-tab'));
     if (t.hasAttribute('data-open')) return openPost(t.getAttribute('data-open'));
     if (t.hasAttribute('data-start')) { var q = unreadQueue(); if (q[0]) openPost(q[0].id); return; }
-    if (t.hasAttribute('data-back')) { if (state.view === 'compose') return leaveCompose(); if (depth() > 0) history.back(); else goTab(state.tab, false); return; }
+    if (t.hasAttribute('data-back')) return goBack();
     if (t.hasAttribute('data-home')) return goTab('home');
     if (t.hasAttribute('data-filter')) { state.filter = t.getAttribute('data-filter'); return refreshBulletins(); }
     if (t.hasAttribute('data-clear')) {
@@ -1341,6 +1411,43 @@
     routeFromHash();
     render('fade');
   });
+
+  /* ---------- Swipe sideways to go back ---------- */
+
+  function goBack() {
+    if (state.view === 'compose') return leaveCompose();
+    if (depth() > 0) history.back(); else goTab(state.tab, false);
+  }
+  var sw = { on: false, decided: false, x: 0, y: 0, dx: 0, el: null };
+  function canSwipe() { return state.me && (state.view === 'post' || state.view === 'readers') && !document.querySelector('.sheet-wrap,.viewer'); }
+  document.addEventListener('touchstart', function (e) {
+    sw.on = false; sw.decided = false; sw.dx = 0;
+    if (!canSwipe() || e.touches.length !== 1) return;
+    var t = e.touches[0];
+    // The outer edges are left alone so the phone's own edge gestures keep working without doubling up.
+    if (t.clientX < 22 || t.clientX > window.innerWidth - 22) return;
+    sw.on = true; sw.x = t.clientX; sw.y = t.clientY; sw.el = app.querySelector('.screen');
+  }, { passive: true });
+  document.addEventListener('touchmove', function (e) {
+    if (!sw.on) return;
+    var t = e.touches[0], dx = t.clientX - sw.x, dy = t.clientY - sw.y;
+    if (!sw.decided) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { sw.on = false; return; }   // scrolling, not swiping
+      if (Math.abs(dx) < 14) return;
+      sw.decided = true;
+    }
+    sw.dx = dx;
+    if (sw.el) { sw.el.style.transition = 'none'; sw.el.style.transform = 'translateX(' + (dx * 0.5) + 'px)'; sw.el.style.opacity = String(Math.max(0.35, 1 - Math.abs(dx) / 420)); }
+  }, { passive: true });
+  function endSwipe() {
+    if (!sw.on) return;
+    sw.on = false;
+    var far = sw.decided && Math.abs(sw.dx) > 90;
+    if (sw.el) { sw.el.style.transition = 'transform .18s ease, opacity .18s ease'; sw.el.style.transform = ''; sw.el.style.opacity = ''; }
+    if (far) goBack();
+  }
+  document.addEventListener('touchend', endSwipe);
+  document.addEventListener('touchcancel', function () { sw.dx = 0; endSwipe(); });
 
   /* ---------- Loading, errors, start ---------- */
 
