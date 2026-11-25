@@ -5,6 +5,13 @@
   var API = 'https://script.google.com/macros/s/AKfycbz7i8unoDEf_x9vOwhwvel71qbyrDs0QVSsQWK7Gm33_LzL9L3EVv3RS_AEXhrVUKMJjQ/exec';
   var STORE_KEY = 'vwp.k';
   var CACHE_KEY = 'vwp.data';
+  var SIZE_KEY = 'vwp.size';
+  var SIZES = { standard: 1, large: 1.14, largest: 1.28 };
+  /** Makes everything in the app bigger for this phone only. */
+  function applySize() {
+    var z = SIZES[lsGet(SIZE_KEY)] || 1;
+    document.documentElement.style.zoom = z === 1 ? '' : String(z);
+  }
   var TZ = 'America/New_York';
 
   var app = document.getElementById('app');
@@ -39,6 +46,8 @@
   }
   function lsGet(key) { try { return localStorage.getItem(key) || ''; } catch (e) { return ''; } }
   function lsSet(key, v) { try { if (v) localStorage.setItem(key, v); else localStorage.removeItem(key); } catch (e) {} }
+
+  applySize();
 
   var toastTimer;
   function toast(msg) {
@@ -241,6 +250,14 @@
     '</button>';
   }
 
+  function textSizeControl() {
+    var cur = SIZES[lsGet(SIZE_KEY)] ? lsGet(SIZE_KEY) : 'standard';
+    return '<div class="textsize"><div class="textsize-label">Text size on this phone</div><div class="seg-group">' +
+      [['standard', 'Standard', 15], ['large', 'Large', 18], ['largest', 'Largest', 21]].map(function (x) {
+        return '<button class="seg-btn' + (cur === x[0] ? ' on' : '') + '" data-size="' + x[0] + '" aria-pressed="' + (cur === x[0]) + '"><b style="font-size:' + x[2] + 'px">A</b>' + x[1] + '</button>';
+      }).join('') + '</div></div>';
+  }
+
   /* ---------- Home ---------- */
 
   function renderHome() {
@@ -278,7 +295,7 @@
         read.slice(0, 5).map(function (p) { return compactRow(p, 'Read'); }).join('') + '</div>';
       if (read.length > 5) html += '<button class="link-btn" data-tab="bulletins">See all bulletins' + icon('chevron-right') + '</button>';
     }
-    return html + '</div>';
+    return html + textSizeControl() + '</div>';
   }
 
   /* ---------- Bulletins ---------- */
@@ -1260,8 +1277,9 @@
   }
 
   function stage4Click(e) {
-    var t = e.target.closest('[data-emailmode],[data-res-edit],[data-res-add],[data-res-clear],[data-rsec],[data-raud],[data-readers],[data-nudge],[data-person-open],[data-person-add],[data-cat-open],[data-setting],[data-teamreload],[data-prole],[data-papp],[data-swatch]');
+    var t = e.target.closest('[data-size],[data-emailmode],[data-res-edit],[data-res-add],[data-res-clear],[data-rsec],[data-raud],[data-readers],[data-nudge],[data-person-open],[data-person-add],[data-cat-open],[data-setting],[data-teamreload],[data-prole],[data-papp],[data-swatch]');
     if (!t) return false;
+    if (t.hasAttribute('data-size')) { lsSet(SIZE_KEY, t.getAttribute('data-size')); applySize(); render(); toast('Text size saved for this phone'); return true; }
     if (t.hasAttribute('data-emailmode')) {
       var em = t.getAttribute('data-emailmode');
       if (em === (state.team && state.team.emailMode)) return true;

@@ -450,3 +450,28 @@ a.mini-btn { display: inline-flex; align-items: center; text-decoration: none; }
 .draft-btn { flex: 0 0 auto !important; width: auto; padding: 0 18px; font-size: 16px; }
 input[type="datetime-local"].input { min-width: 0; text-align: left; }
 .screen { will-change: auto; }
+
+/* ---------- Look: soft gray page, white cards ---------- */
+:root { --bg: #F3F3F1; --soft: #FFFFFF; --line: #E6E6E2; --press: #F6F6F4; }
+body { background: var(--bg); }
+.card, .todo, .calm, .tally, .contact-main, .group, .people, .post-row, .person-row, .res-row, .link-row, .search, .input, .chip, .seg-btn, .stats, .linkbox, .choice { background: #fff; }
+.chip.on, .seg-btn.on { background: var(--green); }
+.post-row:active, .person-row.tap:active, .res-row:active, .post-card:active, .back:active, .bar-back:active { background: var(--press); }
+.todo:active { background: #FDF6F4; }
+.person.on { background: var(--green-soft); }
+.search:focus-within, .input:focus { background: #fff; }
+.sk { background: #E7E7E3; }
+.photo, .thumb, .photo-pick.has { background: #E7E7E3; }
+.veil { background: var(--bg); }
+.tabbar, .readbar, .readbar.quiet { background: rgba(255, 255, 255, .97); }
+.res-row.todo-link, .pending-row, .photo-pick { background: transparent; }
+.pin-group .post-card, .pin-group .post-row { border-color: #C3D2CB; }
+.card, .post-row, .person-row, .res-row, .calm, .tally, .contact-main, .group { box-shadow: 0 1px 2px rgba(25, 25, 25, .03); }
+.fmt button, .res-edit, .mini-btn, .back { background: #fff; }
+.ptr { background: #fff; }
+
+/* ---------- Text size, chosen by each person on their own phone ---------- */
+.textsize { margin-top: 34px; padding-top: 20px; border-top: 1px solid var(--line); }
+.textsize-label { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+.textsize .seg-btn { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.textsize .seg-btn b { font-weight: 600; line-height: 1; }
