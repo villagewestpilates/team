@@ -429,3 +429,12 @@ a.mini-btn { display: inline-flex; align-items: center; text-decoration: none; }
 .readbar.quiet .read-done { flex: 1; justify-content: flex-start; padding-left: 4px; }
 .back-text { flex: 1; min-height: 56px; text-align: left; padding-left: 4px; font-weight: 600; font-size: 16px; color: var(--text); }
 .post-screen.has-bar:has(+ .readbar.quiet), .post-screen:has(+ .readbar.quiet) { padding-bottom: calc(120px + var(--safe-b)); }
+
+/* Pinned stands out: a filled tag on the post, and its own group at the top of Bulletins */
+.mini-pin { background: var(--green); color: #fff; border-radius: 999px; padding: 2px 9px 2px 7px; font-weight: 600; font-size: 12px; gap: 4px; }
+.mini-pin svg.ic { width: 12px; height: 12px; stroke-width: 2.5; }
+.pin-label { display: flex; align-items: center; gap: 6px; color: var(--green); margin-top: 6px; }
+.pin-label svg.ic { width: 14px; height: 14px; stroke-width: 2.5; }
+.pin-group > * + * { margin-top: 10px; }
+.pin-group .post-card, .pin-group .post-row { border-color: #B9CBC3; }
+#list > .section-label:first-child { margin-top: 6px; }
