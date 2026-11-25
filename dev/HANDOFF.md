@@ -36,3 +36,9 @@ Not technical. Plain English, click-by-click steps, short answers, one recommend
 
 ## Publishing the front end
 Bump the number in `version.json` on every publish. index.html reads it uncached and loads app.css, icons.js and app.js with that number, so phones pick up changes the next time the app opens. Do not add static script or stylesheet tags back into index.html.
+
+## Added after stage 5 (owner requests)
+- Swipe sideways on a post to go back, plus a Back button in the bottom bar. The app always opens on Home.
+- Drafts and scheduled posts: Posts columns Status (draft or empty) and PublishAt. A scheduled post becomes visible when its time passes; no time trigger is used. Stage 6 still has to decide how the email for a scheduled post gets sent at that moment (a time trigger needs one more permission).
+- `dev/tools/server_test.js` runs the real Code.js against an in-memory Sheet. Copy src/Code.js beside it first (see its top lines). Run it after any server change.
+- Owner wish list for version 2 (not started): certifications with expiry reminders, onboarding checklist, class milestone badges from Arketa, open sub requests, birthdays and zodiac (opt-in), perks page.

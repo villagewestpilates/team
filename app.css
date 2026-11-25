@@ -438,3 +438,15 @@ a.mini-btn { display: inline-flex; align-items: center; text-decoration: none; }
 .pin-group > * + * { margin-top: 10px; }
 .pin-group .post-card, .pin-group .post-row { border-color: #B9CBC3; }
 #list > .section-label:first-child { margin-top: 6px; }
+
+/* ---------- Drafts, scheduling, swipe ---------- */
+.pending-link { justify-content: flex-start; gap: 8px; margin-top: 12px; padding: 0 4px; }
+.pending-link svg.ic:first-child { width: 16px; height: 16px; }
+.pending-row { background: #fff; border-style: dashed; border-color: #CFCFCB; }
+.pending-ic { width: 36px; height: 36px; border-radius: 50%; background: var(--green-soft); color: var(--green); display: flex; align-items: center; justify-content: center; flex: none; }
+.pending-ic svg.ic { width: 18px; height: 18px; }
+.sched-note { display: flex; align-items: flex-start; gap: 8px; background: var(--green-soft); color: var(--green); border-radius: 14px; padding: 10px 12px; font-size: 15px; font-weight: 500; margin-bottom: 14px; line-height: 1.4; }
+.sched-note svg.ic { width: 18px; height: 18px; margin-top: 2px; }
+.draft-btn { flex: 0 0 auto !important; width: auto; padding: 0 18px; font-size: 16px; }
+input[type="datetime-local"].input { min-width: 0; text-align: left; }
+.screen { will-change: auto; }
