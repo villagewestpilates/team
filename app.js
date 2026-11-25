@@ -191,15 +191,32 @@
 
   /* ---------- Shared pieces ---------- */
 
+  /** Morning, afternoon, evening, or night, with a matching icon and color. */
+  function timeOfDay() {
+    var h = new Date().getHours();
+    if (h >= 5 && h < 12) return { word: 'Good morning', icon: 'sunrise', cls: 'tod-morning' };
+    if (h >= 12 && h < 17) return { word: 'Good afternoon', icon: 'sun', cls: 'tod-afternoon' };
+    if (h >= 17 && h < 21) return { word: 'Good evening', icon: 'sunset', cls: 'tod-evening' };
+    return { word: 'Good evening', icon: 'moon', cls: 'tod-night' };
+  }
+  function stampDay() { return new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date()); }
+  function stampTime() { return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(new Date()); }
   function header() {
-    var me = state.me;
-    return '<header class="hello">' +
-      '<div class="hello-text"><div class="hello-small">' + greeting() + '</div>' +
-      '<div class="hello-name">' + esc(me.firstName) + '</div></div>' +
-      '<div class="brand"><img class="wordmark-img" src="brand/wordmark.png" alt="Village West" width="132" height="11">' +
+    var me = state.me, t = timeOfDay();
+    return '<header class="top">' +
+      '<div class="top-brand"><img class="wordmark-img" src="brand/wordmark.png" alt="Village West" width="156" height="13">' +
       (state.settings.beta ? '<span class="beta">Beta</span>' : '') + '</div>' +
+      '<div class="hello"><span class="tod ' + t.cls + '" aria-hidden="true">' + icon(t.icon) + '</span>' +
+      '<div class="hello-text"><div class="hello-small">' + t.word + '</div>' +
+      '<div class="hello-name">' + esc(me.firstName) + '</div></div>' +
+      '<div class="stamp"><div class="stamp-day">' + stampDay() + '</div><div class="stamp-time" id="stamp-time">' + stampTime() + '</div></div></div>' +
     '</header>';
   }
+  // Keep the clock on Home current without redrawing the screen.
+  setInterval(function () {
+    var el = document.getElementById('stamp-time');
+    if (el) { var now = stampTime(); if (el.textContent !== now) el.textContent = now; }
+  }, 15000);
 
   function catTag(p) {
     var c = cat(p.categoryId);
