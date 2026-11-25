@@ -55,3 +55,9 @@ Bump the number in `version.json` on every publish. index.html reads it uncached
 - Fifth tab is Settings for everyone (text size, home screen tips). Admins also see Team tools there.
 - Edit mode (localStorage vwp.edit): off by default. Editing tools (New post, pencils, drafts, read counts, resource tools) only show when it is on. Browser tests switch it on first. The older live test scripts that click the New post button need it switched on too.
 - The owner is not ready for the written guides or the team text. Next step is a UX audit: Claude lists issues ranked, the owner picks.
+
+## UX audit fixes (done)
+- Team column EditTools: only people with it can post, edit, or manage. Role still decides what someone can see. Seeded on for the owner and the studio manager only. The Edit mode switch (per phone, in Settings) shows only for people who have it.
+- Settings for those admins has two buttons, My settings and Team.
+- Home banner only shows with two or more unread. Bulletins is one compact list. Posts have a single Back button at the bottom plus swipe. Scheduling starts from the review step. Messages show at the bottom on the main tabs. Emails use the logo image.
+- Run every check with `bash dev/tools/all.sh <output folder>` (copy the tools next to a `site` folder and `src/Code.js` first).

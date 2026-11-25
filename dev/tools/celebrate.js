@@ -14,13 +14,13 @@ async function run(browser, reduce) {
   const page = await ctx.newPage(); const errors = []; page.on('pageerror', e => errors.push(String(e)));
   const post = { id: 'a', title: 'Studio closed Thursday', body: 'Short.', categoryId: 'c', pinned: false, needsRead: true, readBy: '', eventDate: '', author: 'Barbara', mine: false, createdAt: '2026-11-23T15:00:00Z', updated: false, buttonText: '', links: [], forMe: true, readAt: '', photo: null };
   await page.route('**/script.google.com/**', route => { const q = JSON.parse(route.request().postData()); route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(q.action === 'boot' ? { ok: true, me: { id: 'p', name: 'Megan Hopkins', firstName: 'Megan', role: 'member' }, settings: { beta: true }, categories: [{ id: 'c', name: 'Announcements', color: '#3F5FC0' }], posts: [post], resources: [], contacts: [] } : { ok: true, readAt: new Date().toISOString() }) }); });
-  await page.goto('http://localhost:8777/?k=' + 'k'.repeat(30)); await page.waitForSelector('.todo');
+  await page.goto('http://localhost:8777/?k=' + 'k'.repeat(30)); await page.waitForSelector('.post-card');
   if (!reduce) {
     const b = await page.evaluate(() => { const beta = document.querySelector('.beta').getBoundingClientRect(), logo = document.querySelector('.wordmark-img').getBoundingClientRect(); const mid = r => (r.left + r.right) / 2; return { above: beta.bottom <= logo.top, betaC: Math.abs(mid(beta) - window.innerWidth / 2) < 2, logoC: Math.abs(mid(logo) - window.innerWidth / 2) < 2 }; });
     check('Beta tag sits above the logo, both centered', b.above && b.betaC && b.logoC, JSON.stringify(b));
     await page.screenshot({ path: path.join(OUT, 'header-beta-above.png'), clip: { x: 0, y: 0, width: 390, height: 230 } });
   }
-  await page.click('[data-start]'); await page.waitForSelector('#markread'); await page.click('#markread'); await page.waitForSelector('.done');
+  await page.click('.post-card'); await page.waitForSelector('#markread'); await page.click('#markread'); await page.waitForSelector('.done');
   await page.waitForTimeout(700);
   const bits = await page.$$eval('.party .bit', e => e.length).catch(() => 0);
   if (reduce) { check('reduced motion setting: no celebration, screen still shows', bits === 0 && !!(await page.$('.done h1'))); }
