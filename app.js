@@ -499,9 +499,8 @@
       html = renderDone();
     } else {
       html = state.tab === 'home' ? renderHome() : state.tab === 'bulletins' ? renderBulletins() : state.tab === 'team' ? renderTeam() : state.tab === 'resources' ? renderResources() : state.tab === 'contact' ? renderContact() : renderSoon();
-      if (state.tab === 'home' || state.tab === 'bulletins' || state.tab === 'resources') {
-        html += editChip();
-        if (state.canPost && editing() && state.tab !== 'resources') html += '<button class="fab" data-compose="new">' + icon('plus') + 'New post</button>';
+      if (state.canPost && editing() && (state.tab === 'home' || state.tab === 'bulletins')) {
+        html += '<button class="fab" data-compose="new">' + icon('plus') + 'New post</button>';
       }
     }
     app.innerHTML = html;
@@ -1177,7 +1176,7 @@
 
   function mySettings() {
     var me = state.me;
-    return '<h2 class="section-label" style="margin-top:4px">Text size on this phone</h2>' + textSizeControl() +
+    return '<h2 class="section-label"' + (state.canPost || state.me.role === 'admin' ? '' : ' style="margin-top:4px"') + '>Text size on this phone</h2>' + textSizeControl() +
       '<p class="fine" style="margin-top:10px">Makes everything in the app bigger. It only changes this phone.</p>' +
       '<h2 class="section-label">Keep the app handy</h2><div class="card"><p><b>iPhone:</b> open your link in Safari, tap the Share button, then "Add to Home Screen."</p>' +
       '<p style="margin-top:10px"><b>Android:</b> open it in Chrome, tap the three dots, then "Add to Home screen."</p></div>' +
@@ -1189,9 +1188,10 @@
 
   function renderTeam() {
     var t = state.team;
-    var head = '<div class="screen"><h1 class="page-title">Settings</h1>' + mySettings();
-    if (state.canPost || state.me.role === 'admin') head += '<h2 class="section-label">Edit mode</h2><div class="group" style="margin-top:0">' +
-      toggle('edit', editing(), 'Show editing tools', 'New post, pencils, drafts, and read counts. Off shows the app the way the team sees it. Only changes this phone.').replace('data-toggle="edit"', 'data-editmode="1"') + '</div>';
+    var head = '<div class="screen"><h1 class="page-title">Settings</h1>';
+    if (state.canPost || state.me.role === 'admin') head += '<h2 class="section-label" style="margin-top:4px">Edit mode</h2><div class="group" style="margin-top:0">' +
+      toggle('edit', editing(), 'Show editing tools', 'Turns on New post, pencils, drafts, and read counts. Off shows the app the way the team sees it.').replace('data-toggle="edit"', 'data-editmode="1"') + '</div>';
+    head += mySettings();
     if (state.me.role !== 'admin') return head + '</div>';
     head += '<h1 class="page-title sub-title">Team</h1>';
     if (!t) { loadTeam(); return head + '<div class="sk" style="height:56px;border-radius:16px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:26px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:10px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:10px"></div></div>'; }
