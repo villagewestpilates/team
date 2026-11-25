@@ -392,3 +392,6 @@ button.stats { cursor: pointer; }
 .swatch.on { box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--text); }
 .swatch.on svg.ic { opacity: 1; }
 .link-btn svg.ic:first-child { width: 18px; height: 18px; }
+
+.post-card { cursor: pointer; }
+.post-card:active { background: var(--soft); }

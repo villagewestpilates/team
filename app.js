@@ -215,7 +215,7 @@
 
   /** Big card for a post that still needs to be read. */
   function unreadCard(p) {
-    return '<article class="card post-card">' +
+    return '<article class="card post-card" data-open="' + esc(p.id) + '">' +
       '<div class="card-top">' + catTag(p) + statusPill(p) + '</div>' +
       '<div class="card-main"><div class="card-main-text"><h3 class="card-title">' + esc(p.title) + '</h3>' +
       extras(p) +
