@@ -10,6 +10,9 @@
   var app = document.getElementById('app');
   var tabbar = document.getElementById('tabbar');
   var toastEl = document.getElementById('toast');
+  var veil = document.createElement('div');
+  veil.className = 'veil'; veil.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(veil);
 
   var state = {
     k: '', me: null, settings: { beta: false }, categories: [], posts: [],
@@ -207,14 +210,13 @@
   /** Compact row for a post that is read, or that does not need marking. */
   function compactRow(p, when) {
     var c = cat(p.categoryId);
-    var sub = p.readAt
-      ? '<span class="row-read">' + icon('check') + esc(when || 'Read') + '</span><span class="sep">·</span>By ' + esc(p.author)
-      : 'By ' + esc(p.author) + '<span class="sep">·</span>' + fullDate(p.createdAt);
+    var sub = 'By ' + esc(p.author) + '<span class="sep">·</span>' + fullDate(p.createdAt);
+    var status = p.readAt ? '<span class="row-read">' + icon('check') + 'Read</span>' : '';
     return '<button class="post-row" data-open="' + esc(p.id) + '">' +
       '<span class="dot" style="background:' + esc(c.color) + '"></span>' +
       '<span class="post-row-text"><span class="post-row-title">' + esc(p.title) + '</span>' +
       '<span class="post-row-sub">' + (p.pinned ? '<span class="row-pin">' + icon('pin') + '</span>' : '') + sub + '</span></span>' +
-      icon('chevron-right') +
+      status + icon('chevron-right') +
     '</button>';
   }
 
@@ -377,8 +379,9 @@
       html = state.tab === 'home' ? renderHome() : state.tab === 'bulletins' ? renderBulletins() : renderSoon();
     }
     app.innerHTML = html;
-    var scr = app.querySelector('.screen');
-    if (scr && anim) scr.classList.add(anim);
+    // A soft white veil fades away over the new screen. The text itself never animates,
+    // so it cannot shift or change size as it settles.
+    if (anim) { veil.classList.remove('go'); void veil.offsetWidth; veil.classList.add('go'); }
     var held = document.querySelector('#markread[data-hold]');
     if (held) setTimeout(function () { held.disabled = false; held.classList.remove('holding'); }, 3000);
     tabbar.hidden = state.view === 'post';
