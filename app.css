@@ -506,3 +506,21 @@ body { background: var(--bg); }
 .editchip .switch.on span { transform: translateX(14px); }
 .editchip.on { color: var(--green); border-color: #B9CBC3; }
 .screen:has(+ .editchip) { padding-bottom: calc(var(--tab-h) + var(--safe-b) + 96px); }
+
+/* ---------- Beta above the logo ---------- */
+.top-brand { flex-direction: column; gap: 8px; margin: 0 0 24px; }
+
+/* ---------- Celebration ---------- */
+.party { position: fixed; inset: 0; pointer-events: none; z-index: 45; overflow: hidden; }
+.bit { position: absolute; display: block; margin: -4px 0 0 -4px; border-radius: 50%; opacity: 0; animation: burst 1600ms cubic-bezier(.15, .7, .3, 1) both; will-change: transform, opacity; }
+.bit.s1 { border-radius: 2px; }
+.bit.s2 { background: none; border: 2.5px solid; }
+@keyframes burst {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0) scale(.4); }
+  8% { opacity: 1; }
+  55% { opacity: 1; transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx), calc(var(--dy) + var(--fall))) rotate(calc(var(--rot) * 1.6)) scale(.9); }
+}
+.done .bubble.pop { animation: pop 520ms cubic-bezier(.2, 1.6, .4, 1) both; }
+@keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .party { display: none; } }
