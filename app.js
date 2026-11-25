@@ -124,10 +124,10 @@
 
   /* ---------- Talking to the server ---------- */
 
-  function api(action, data) {
+  function api(action, data, wait) {
     var body = Object.assign({ action: action, k: state.k }, data || {});
     var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 30000);
+    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, wait || 30000);
     return fetch(API, {
       method: 'POST', credentials: 'omit', redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -537,14 +537,14 @@
       var url = URL.createObjectURL(file), img = new Image();
       img.onload = function () {
         try {
-          var tries = [[1280, 0.72], [1100, 0.62], [900, 0.55]], out = null;
+          var tries = [[1100, 0.7], [960, 0.62], [800, 0.55], [640, 0.5]], out = null;
           for (var i = 0; i < tries.length; i++) {
             var scale = Math.min(1, tries[i][0] / Math.max(img.naturalWidth, img.naturalHeight));
             var w = Math.max(1, Math.round(img.naturalWidth * scale)), h = Math.max(1, Math.round(img.naturalHeight * scale));
             var c = document.createElement('canvas'); c.width = w; c.height = h;
             var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
             out = { data: c.toDataURL('image/jpeg', tries[i][1]), w: w, h: h };
-            if (out.data.length < 420000) break;
+            if (out.data.length < 240000) break;
           }
           URL.revokeObjectURL(url);
           resolve(out);
@@ -820,7 +820,7 @@
       post: { id: d.id, title: d.title, body: d.body, categoryId: d.categoryId, pinned: d.pinned, needsRead: d.needsRead,
         readBy: d.readBy, audience: d.audience, audienceIds: d.audienceIds, buttonText: d.buttonText,
         links: d.links, eventDate: isPromo(d.categoryId) ? d.eventDate : '', skipEmail: d.skipEmail }
-    }).then(function (res) {
+    }, 75000).then(function (res) {
       sending = false;
       closeSheet();
       if (!res || !res.ok) { toast((res && res.message) || 'That didn\'t save. Try again.'); return; }
