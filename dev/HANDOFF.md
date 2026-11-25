@@ -1,63 +1,142 @@
-# VWP Team App: handoff for a new Claude session
+# Village West Team App: project handoff
 
-Read this first, then the owner's original build prompt (they will paste it). No team names, emails, tokens, or Sheet contents belong in this repository. It is public.
+Last updated: 2026-11-25, at the end of the first build session.
 
-## Where things stand
-- Stage 0 (setup, hello tests): done. Test A (HtmlService) fails in multi-account browsers. Test B (JSON service) works. We are building **version B**.
-- Stage 1 (personal links): done and confirmed by the owner on Mac and iPhone home screen.
-- Stages 2 to 5 are built and published: Home, Bulletins, reading, posting, photos (in the Sheet Photos tab), thumbnails, post-as, bold and bullets, who-has-read, Team screen, categories, Beta switch, Resources (admin-managed, blank links hidden from the team), Contact (numbers live in Settings key Contacts, never in this public repo). Nudge and "Email it" buttons answer "email is off" until stage 6. The Test Person token was rotated in stage 4, so ask the owner for the current one. Next: **Stage 6** (email). Send nothing to the team until the owner says go; test emails go only to the owner's personal address from the original prompt.
-- Small carry-overs for stage 2: put the Beta tag beside the VILLAGE WEST wordmark (currently below it). Replace the stage 1 placeholder Home card.
-- Later: in stage 4, remind the owner to tap "New link" on their own row (their token appeared in a screenshot). At the very end, deactivate the "Test Person" row.
+Read this first. It is written for a session that has never seen the project. This repository is public, so nothing here names team members, and no emails, phone numbers, tokens, or Sheet contents belong in it.
 
-## Pieces
-- **Front end (this repo, root):** static site on GitHub Pages at https://team.villagewestpilates.com (CNAME file, Enforce HTTPS on). Files: index.html, app.js, app.css, icons.js (Lucide 0.460.0 inlined), fonts/ (Inter variable, self-hosted), icons/, manifest.webmanifest (no start_url on purpose so the home screen shortcut keeps ?k=). Publish = commit and push to main.
-- **Server:** Apps Script project owned by the studio's hello@ account. Script ID `1XU3DPukvbnu6bSOFzlNia8JqbjE1758htPSs95kpCALfCt7FbPIgyHN7`. Source is NOT in this repo. Get it with `clasp clone-script <scriptId> --rootDir src` in a scratch folder outside this repo.
-- **Production deployment ID (never create another):** `AKfycbz7i8unoDEf_x9vOwhwvel71qbyrDs0QVSsQWK7Gm33_LzL9L3EVv3RS_AEXhrVUKMJjQ`. Ship server changes with `clasp push --force` then `clasp update-deployment <id> -d "Production"`.
-- **Data:** Google Sheet "VWP Team App Data", private to hello@. Its ID is in Script Properties (SHEET_ID). Tabs seeded: Team (13 people + Test Person), Categories, Resources, Settings, Posts (welcome post), Reads, Views.
+## 1. What this is
 
-## How the server works (Code.js)
-- doPost takes text/plain JSON `{action, k, ...}`, returns JSON. `route_` checks the token on every call (`auth_`), then calls the function in `ACTIONS`. Only `boot` exists so far.
-- `ensureSeeded_()` runs seeding automatically on first request, gated by Script Property SEED_VERSION (currently 1). To add data migrations, bump SEED_VERSION and add a seedV2_. The owner never has to click Run again unless scopes change (do not add scopes).
-- Helpers: `table_(tab)` reads rows as objects with `_row`; `appendRows_`; `withLock_` (LockService); `yes_`; `newToken_`; `newId_`.
-- Sheet columns are defined in `TABS`; `ensureTabs_` adds missing columns without touching data. Rows are never deleted (Archived / Deactivated / Voided columns).
-- Team has an `IsTest` column: Test Person must be left out of every count and never emailed.
-- appsscript.json must keep the webapp block and the two scopes (see dev/appsscript.reference.json).
+An internal team app for Village West, a boutique Pilates studio growing into a wider group (Pilates, Athletic Club, Wellness Collaborative). Leadership posts updates, each team member marks them as read, and the app holds resources and contact shortcuts. About 13 people use it.
 
-## Setting up a new cloud session
-1. The session must be started with this repository selected so pushes work. Commit as `Claude <noreply@anthropic.com>`.
-2. The environment already allows script.google.com, script.googleusercontent.com, team.villagewestpilates.com, villagewestpilates.github.io.
-3. `npm i @google/clasp@3.4.1` in a scratch folder, then `NODE_USE_ENV_PROXY=1 npx clasp login --no-localhost` (feed the pasted redirect URL on stdin). The owner signs in as hello@ in a private window and pastes back the localhost address. Login does not survive between sessions. If login or first push fails twice, stop and tell the owner.
-4. Testing needs the Test Person's token. Ask the owner to copy it from the Team tab (the Test Person row) and paste it in chat. Save it as `.test-token.json` (`{"k":"..."}`) outside this repo. Never use a real person's token.
-5. `dev/tools/shots.js` serves the site locally and screenshots it at 390px against the real server (Playwright; proxy needs `bypass: 'localhost,127.0.0.1'` and `ignoreHTTPSErrors: true`). `dev/tools/live.js` checks the live address. Paths inside them assume the old folder layout, so adjust.
-6. `dev/tools/icon.html` builds the home screen icon (sage #465a50 V monogram and TEAM on white, sage inner border). The owner approved this look.
+The owner is not technical and manages everything from an iPhone. They want plain English, short answers, one recommendation rather than a menu, and click-by-click steps for anything they do themselves.
 
-## Owner preferences
-Not technical. Plain English, click-by-click steps, short answers, one recommendation. Stop at the end of each stage for an OK. No team emails until told "go"; test emails only to the owner's personal address given in the original prompt.
+## 2. Status
 
-## Publishing the front end
-Bump the number in `version.json` on every publish. index.html reads it uncached and loads app.css, icons.js and app.js with that number, so phones pick up changes the next time the app opens. Do not add static script or stylesheet tags back into index.html.
+- **Built and live:** stages 0 to 6 of the original plan, plus a round of UX fixes. Nothing has been sent to the team. The owner is the only real user so far.
+- **Email is in TEST mode.** Every email goes only to the owner's own address. Only the owner switches it to live. Never switch it for them.
+- **Not written yet, on purpose:** the admin guide, the team guide, and the text to send the team with their links. The owner said they are not ready for these.
+- **Next:** the owner wants an independent product, design, and strategy review before launch. Their brief asks for read-only discovery first. The previous session started that discovery and stopped to hand off (see section 11).
 
-## Added after stage 5 (owner requests)
-- Swipe sideways on a post to go back, plus a Back button in the bottom bar. The app always opens on Home.
-- Drafts and scheduled posts: Posts columns Status (draft or empty) and PublishAt. A scheduled post becomes visible when its time passes; no time trigger is used. Stage 6 still has to decide how the email for a scheduled post gets sent at that moment (a time trigger needs one more permission).
-- `dev/tools/server_test.js` runs the real Code.js against an in-memory Sheet. Copy src/Code.js beside it first (see its top lines). Run it after any server change.
-- Owner wish list for version 2 (not started): certifications with expiry reminders, onboarding checklist, class milestone badges from Arketa, open sub requests, birthdays and zodiac (opt-in), perks page.
+## 3. Architecture
 
-## Stage 6 (email): built, in TEST mode
-- Settings key EmailMode is off, test, or live. It was seeded as test, with TestEmail set to the owner's personal address. In test mode every email goes only to that address, marked [Test], one sample per action. The owner switches to live under Team, App settings. Do not switch it for them.
-- Emails: new post, real change, nudge, personal link. All go through sendMail_ in Code.js, the only caller of MailApp. Every send is logged in the EmailLog tab.
-- Scheduled posts: the email goes out the next time anyone opens the app after the time has passed (sendDue_ in boot). A time trigger would make it exact but needs one more permission; the owner has not decided.
-- `dev/tools/server_test_email.js` checks all of this against a pretend mail service.
-- Still to do: the three written guides from the FINISH section of the original prompt, then deactivate the Test Person row when the owner is done testing.
+Chosen after a test in stage 0. A standard Apps Script web page failed for anyone signed in to more than one Google account, which is most of this team. So the screen lives outside Google and talks to Apps Script as a JSON service.
 
-## Design changes made at the owner's request (these replace parts of the original prompt)
-- Soft gray page with white cards. Official VILLAGE WEST wordmark image, top and center on Home, with a time-of-day icon and a day and time stamp.
-- Fifth tab is Settings for everyone (text size, home screen tips). Admins also see Team tools there.
-- Edit mode (localStorage vwp.edit): off by default. Editing tools (New post, pencils, drafts, read counts, resource tools) only show when it is on. Browser tests switch it on first. The older live test scripts that click the New post button need it switched on too.
-- The owner is not ready for the written guides or the team text. Next step is a UX audit: Claude lists issues ranked, the owner picks.
+- **Front end (this repo, root):** a static site on GitHub Pages at https://team.villagewestpilates.com (CNAME file, Enforce HTTPS on, DNS at Squarespace). Hand-written HTML, CSS, and JavaScript. No framework, no build step, no CDN. Files: `index.html`, `app.js`, `app.css`, `icons.js` (Lucide 0.460.0, inlined), `fonts/` (Inter, self-hosted), `icons/`, `brand/wordmark.png`, `manifest.webmanifest`, `version.json`.
+- **Server:** one Google Apps Script project owned by the studio's main Google account. Script ID `1XU3DPukvbnu6bSOFzlNia8JqbjE1758htPSs95kpCALfCt7FbPIgyHN7`. The source (`Code.js`, about 1,150 lines, and `appsscript.json`) is NOT in this repo because its seed data contains private details. It lives in Apps Script, with numbered versions.
+- **Production deployment ID, never create another:** `AKfycbz7i8unoDEf_x9vOwhwvel71qbyrDs0QVSsQWK7Gm33_LzL9L3EVv3RS_AEXhrVUKMJjQ` (at version 11). Every personal link depends on this address and on the site address. Neither may change.
+- **Database:** a Google Sheet, "VWP Team App Data", private to the owning account. Tabs: Posts, Team, Reads, Views, Categories, Resources, Settings, Photos, EmailLog. Rows are never deleted. Columns named Archived, Deactivated, and Voided keep history.
+- **Scopes:** spreadsheets and send-mail only. Adding any scope means the owner must click Allow again, and the live app stops answering until they do.
 
-## UX audit fixes (done)
-- Team column EditTools: only people with it can post, edit, or manage. Role still decides what someone can see. Seeded on for the owner and the studio manager only. The Edit mode switch (per phone, in Settings) shows only for people who have it.
-- Settings for those admins has two buttons, My settings and Team.
-- Home banner only shows with two or more unread. Bulletins is one compact list. Posts have a single Back button at the bottom plus swipe. Scheduling starts from the review step. Messages show at the bottom on the main tabs. Emails use the logo image.
-- Run every check with `bash dev/tools/all.sh <output folder>` (copy the tools next to a `site` folder and `src/Code.js` first).
+### How the server works
+- `doPost` takes text/plain JSON `{action, k, ...}` and returns JSON. `route_` checks the token on every call, then runs the function in `ACTIONS`.
+- `ensureSeeded_()` runs data migrations automatically on the first request after a deploy, gated by Script Property `SEED_VERSION` (now 8). Add a `seedVn_` and bump the number.
+- `TABS` defines the Sheet columns. `ensureTabs_` adds missing columns without touching data.
+- Helpers: `table_`, `appendRows_`, `updateRow_`, `withLock_`, `cell_` (stops text being read as a formula).
+- All email goes through `sendMail_`, the only caller of MailApp.
+
+### How the front end works
+- `index.html` fetches `version.json` uncached, then loads `app.css`, `icons.js`, and `app.js` with that number. **Bump `version.json` on every publish.** Do not add static script or stylesheet tags back.
+- One boot call loads everything. The last response is cached on the phone so the app paints instantly, then refreshes quietly.
+- Screens are tracked after the `#`. The `?k=` token stays in the address so a home screen icon keeps working. The app always opens on Home, except an email link with `&p=POSTID`.
+- The manifest has no `start_url` on purpose, so the saved icon keeps the person's own link.
+
+## 4. Access model
+
+- **Personal links, no passwords.** Each person has a random 32-character token. Their link is the site address plus `?k=TOKEN`. The token is sent in the request body, never in the Apps Script address. Deactivating a person or issuing a new link takes effect immediately.
+- **Role decides what someone can SEE:** Admin (everything, including Admins-only resources), Poster, Team member. The Apprentices group is separate and controls some resources and post audiences.
+- **"Editing tools" decides what someone can DO.** It is a per-person switch (Team column `EditTools`). Only people with it can post, edit, see read counts, or manage the team. It is on for the owner and the studio manager only. The other Admin and the one Poster have it off for now, by the owner's choice.
+- **Edit mode** is a per-phone switch in Settings, only shown to people with editing tools. It is off by default so they see the app the way the team does.
+- The server enforces all of this. The UI switches are convenience, not security.
+
+## 5. What is built
+
+- **Home:** official wordmark top and center with a Beta tag above it, greeting with a time-of-day icon, day and time stamp. "N posts to read" banner (only with two or more), unread cards, "Good to know", "Already read".
+- **Reading:** opening a post never marks it read. Only the "Mark as read" button does, and it cannot be undone by the reader. Longer posts hold the button for three seconds. Reading moves through unread posts in order, then shows "You're all caught up" with a small celebration. Swipe sideways or use the bottom Back button to leave.
+- **Bulletins:** one compact list, pinned group first, search, filters by category and unread.
+- **Posting:** title, text (bold and bullets), photo, category, audience (everyone, apprentices, selected people), needs-read switch, read-by date, pin, custom button wording, two link buttons, event date for promotions, "posted by" for admins. Drafts with saved times. Scheduled posts in studio time. A review step before anything goes out. Editing asks "small fix or real change?"; a real change resets reads and re-notifies.
+- **Who has read:** Read, Opened but not marked, Not opened, with last visit and nudges.
+- **Resources:** searchable sections managed in the app. Entries without a link are hidden from the team.
+- **Contact:** text-message shortcuts. Numbers are stored in the Sheet's Settings tab.
+- **Settings (fifth tab, everyone):** text size (Standard, Large, Largest), home screen tips, who you are signed in as. People with editing tools also get Edit mode, and Admins with tools get a Team view: add or edit people, links, deactivate, Beta switch, email mode, categories.
+- **Email:** new post, real change, nudge, personal link. Modes are off, test, and live.
+
+## 6. Decisions the owner has made (do not undo without asking)
+
+- Wording: "read", "Open and read", "Mark as read". Never "sign", "sign off", or "confirm".
+- Four categories to start: Announcements, Policies, Schedule, Promotions & Events.
+- No emoji, no em dashes, warm plain voice.
+- Soft gray page with white cards (replaced the original pure white).
+- The "VILLAGE WEST" wordmark without "PILATES", because the brand is growing into a wider umbrella.
+- Home screen icon: sage V and TEAM on white with a sage border.
+- No initial bubble beside the name. Read status shown apart from the author's name ("By Adam").
+- Swipe to go back is preferred over a top-left arrow.
+- Photos are stored inside the Sheet, to avoid a Drive permission.
+- Bulletins as compact rows (a change from the original spec; the owner agreed, and may revisit after real use).
+
+## 7. Approaches tried and rejected
+
+- **Apps Script HtmlService front end:** fails with multiple Google accounts. Do not go back to it.
+- **Asking people to use a private window:** breaks the home screen icon and email links.
+- **Fading or sliding whole screens in:** made text appear to resize on iPhone. Screens now appear in place under a brief veil.
+- **A floating Edit mode switch:** covered content. It lives in Settings.
+- **Scheduling inside the form:** hard to find. It starts from the review step.
+
+## 8. Tests: what "296 checks" actually means
+
+Run everything with `bash dev/tools/all.sh <output folder>`. The tools expect a `site` folder and `src/Code.js` beside a `tools` folder, and the Playwright package.
+
+- **Browser checks, about 217:** Chromium at phone width against a **faked server**. They cover layout, flows, wording, and error states. They do not prove the real server and the real screen agree.
+- **Server checks, 79:** the real `Code.js` run in Node against an in-memory Sheet and a pretend mail service (`server_test.js`, `server_test_email.js`). They cover permissions, audiences, drafts, scheduling, and who gets emailed.
+- **Live checks, a handful:** scripts named `live*.js` that hit the real deployment as the Test Person. They are run by hand and several are stale.
+
+Limits to be honest about: no real iPhone or Safari, no real team member's view of the live system, no continuous integration, no visual regression, and no automated accessibility scan. It is a useful functional baseline, not a complete one.
+
+## 9. Known gaps and risks
+
+- **No separate test environment.** One Sheet, one deployment. Live tests use a "Test Person" row that is hidden from counts and never emailed. Design experiments should use static prototypes with made-up data so they cannot touch real data or send anything.
+- **Server code has no home outside Google and whatever session last cloned it.** Recommended: a private GitHub repository. Needs the owner's approval.
+- **No backup of the Sheet** beyond Google's own version history.
+- **Tokens are long-lived bearer links.** One appeared in a screenshot early on. The owner should issue themselves a new link.
+- **Editing a post overwrites its text.** After a "real change" there is no record of the wording people originally read. This matters if read records are ever used as proof of acknowledgment.
+- **The Views tab logs every app open per person.** Admins see "last in the app". The owner should decide whether that level of tracking is wanted.
+- **A staff phone number sits in this repository's early history.** It was removed from the current files. Scrubbing history is possible and was left for the owner to decide.
+- **A dead one-time endpoint (`claimTest`)** is still in the server code and should be removed.
+- **The Test Person is an Admin with editing tools.** Deactivate it before launch.
+- **Scheduled-post emails** go out the next time anyone opens the app after the scheduled time. A time trigger would make them exact but needs one more permission. Undecided.
+- **Before launch:** the linked Drive files are all Restricted, five resources have no link, and the written guides are not done.
+
+## 10. Owner's wish list for later (not started, not approved)
+
+Certifications with expiry reminders, an onboarding checklist, class milestone badges from the studio's booking system, open sub requests, birthdays and zodiac (opt-in), a perks page, shout-outs, a Monday digest, polls and RSVPs, a records export, a "preview as a team member" mode.
+
+## 11. Discovery for the product and strategy review: verified so far (2026-11-25)
+
+Confirmed by direct observation in the cloud session:
+- Claude Code 2.1.332. Model `claude-fable-5-2`. Permission mode "auto". Anthropic cloud environment with limited network access; the environment allows the Apps Script hosts and the app's own address.
+- This repository has no `CLAUDE.md` and no `.claude` folder. This file is the only durable project knowledge.
+- The repository was clean and fully pushed, with a single branch, `main`.
+- Available in that session: subagents, a workflow tool for multi-agent runs, creating and messaging other cloud sessions, scheduled tasks, skills, a headless browser with Playwright, and connectors for Google Drive, Gmail, Calendar, the studio's booking system, Canva, and others. A Mac was not attached.
+
+Checked against official sources:
+- Agent teams are real but experimental and off by default, and use far more tokens. https://code.claude.com/docs/en/agent-teams
+- Nothing was found under the names "Claude Ship" or "PR Steward". The official feature is Code Review, which reviews pull requests and does not merge them. https://code.claude.com/docs/en/code-review
+- Google Workspace CLI launched in March 2026. A November 24 general availability announcement could not be confirmed. https://github.com/googleworkspace/cli/releases
+- GitHub Agentic Workflows is active; version 1.0.1 shipped October 27, 2026. https://github.github.com/gh-aw/blog/2026-11-02-weekly-update/
+- Hooks in a repository's settings file do not run in every kind of cloud session, so they cannot be assumed as a safeguard. https://code.claude.com/docs/en/cloud-environments
+
+Not yet done: the capability inventory in full, the comparison of workflows, the security review beyond section 9, the Apple and Mac investigation, and the automation opportunities.
+
+## 12. Setting up a new cloud session
+
+1. Start it with this repository selected so pushes work. Commit as `Claude <noreply@anthropic.com>`.
+2. For read-only work, nothing else is needed. The front end and these notes are all here.
+3. To read or change the server: in a scratch folder outside this repo, `npm i @google/clasp@3.4.1`, then `NODE_USE_ENV_PROXY=1 npx clasp login --no-localhost`. The owner signs in as the studio's main account in a private window and pastes back the address the browser lands on. Then `clasp clone-script <scriptId> --rootDir src`. The login does not survive between sessions. If login or the first push fails twice, stop and tell the owner.
+4. Ship server changes with `clasp push --force`, then `clasp update-deployment <production id> -d "Production"`. Use clasp 3.x command names only.
+5. Live tests need the Test Person's token. Ask the owner to copy it from the Team tab and paste it in chat. Keep it outside this repo. Never use a real person's token.
+6. Browser tests need the proxy bypassed for localhost and Edit mode switched on first (`localStorage vwp.edit = 1`); the scripts in `dev/tools` already do this.
+
+## 13. Working rules
+
+- Stop and ask before anything that changes what the team sees, costs money, needs a new account, sends email, or changes someone's access.
+- Say what was tested and what could not be tested. Never claim something works without running it.
+- Push back when a request is a bad idea, and recommend one alternative.
