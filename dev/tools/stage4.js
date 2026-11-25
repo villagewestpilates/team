@@ -69,7 +69,9 @@ function world() {
   check('last visit wording', subs[2].startsWith('Opened ') && subs[3].startsWith('Last in the app ') && subs[4] === 'Hasn\'t opened the app yet', subs.join(' / '));
   check('nudge buttons only for people who have not read', (await pg.$$('.mini-btn')).length === 3);
   await shot(pg, '03-who-has-read');
-  await pg.click('.mini-btn'); await pg.waitForTimeout(300);
+  const sentBefore = s.sent.filter(r => r.action === 'nudge').length;
+  await pg.$eval('.mini-btn', b => { b.click(); b.click(); b.click(); }); await pg.waitForTimeout(300);
+  check('a triple tap on Nudge sends one request', s.sent.filter(r => r.action === 'nudge').length - sentBefore === 1, String(s.sent.filter(r => r.action === 'nudge').length - sentBefore));
   check('nudge says email is off for now', (await toast(pg)).startsWith('Email isn\'t switched on yet'));
   await pg.click('[data-back]'); await pg.waitForSelector('.post-body'); check('back returns to the post', true);
   await pg.click('[data-back]'); await pg.waitForSelector('#tabbar:not([hidden])');

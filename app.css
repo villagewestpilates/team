@@ -215,6 +215,7 @@ svg.ic { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor
 @keyframes rise { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
 .readbar-in { max-width: 390px; margin: 0 auto; }
 .readbar-note { color: var(--muted); font-size: 14px; line-height: 1.4; text-align: center; margin-top: 10px; }
+.readbar-note.err { color: var(--coral-text); font-weight: 500; }
 .readbar.quiet { background: var(--soft); }
 .read-done { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--green); font-weight: 600; font-size: 15px; min-height: 28px; }
 .read-done svg.ic { width: 18px; height: 18px; stroke-width: 2.5; }
