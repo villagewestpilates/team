@@ -395,3 +395,6 @@ button.stats { cursor: pointer; }
 
 .post-card { cursor: pointer; }
 .post-card:active { background: var(--soft); }
+
+.todo { cursor: pointer; }
+.todo:active { background: #FDF6F4; }

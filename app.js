@@ -249,7 +249,7 @@
 
     if (unread.length) {
       var due = unread[0].readBy;
-      html += '<section class="todo">' +
+      html += '<section class="todo" data-start="1">' +
         '<div class="todo-text"><div class="todo-count">' + unread.length + (unread.length === 1 ? ' post to read' : ' posts to read') + '</div>' +
         '<div class="todo-sub">' + (due ? 'Earliest due ' + fullDate(due) : 'Takes about a minute each') + '</div></div>' +
         '<button class="btn-start" data-start="1">Start</button>' +
