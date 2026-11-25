@@ -5,7 +5,7 @@ Read this first, then the owner's original build prompt (they will paste it). No
 ## Where things stand
 - Stage 0 (setup, hello tests): done. Test A (HtmlService) fails in multi-account browsers. Test B (JSON service) works. We are building **version B**.
 - Stage 1 (personal links): done and confirmed by the owner on Mac and iPhone home screen.
-- Stages 2 and 3 (Home, Bulletins, reading, posting, photos): built and published. Photos are stored in the Sheet (Photos tab, base64 in 40k pieces), no Drive permission. A test post "Test post: try Mark as read" is addressed to the owner only. Waiting on the owner to try stage 3 and say OK. Next: **Stage 4** (who has read, Team screen).
+- Stages 2, 3 and 4 are built and published: Home, Bulletins, reading, posting, photos (stored in the Sheet Photos tab, no Drive permission), thumbnails, post-as, bold and bullets, who-has-read, Team screen, categories, Beta switch. Nudge and "Email it" buttons exist but the server answers "email is off" until stage 6. The Test Person token was rotated in stage 4, so ask the owner for the current one. A test post "Test post 2" is addressed to the owner only. Waiting on the owner to try stage 4 and say OK. Next: **Stage 5** (Resources and Contact).
 - Small carry-overs for stage 2: put the Beta tag beside the VILLAGE WEST wordmark (currently below it). Replace the stage 1 placeholder Home card.
 - Later: in stage 4, remind the owner to tap "New link" on their own row (their token appeared in a screenshot). At the very end, deactivate the "Test Person" row.
 
