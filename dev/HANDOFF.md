@@ -68,7 +68,7 @@ Chosen after a test in stage 0. A standard Apps Script web page failed for anyon
 - Soft gray page with white cards (replaced the original pure white).
 - The "VILLAGE WEST" wordmark without "PILATES", because the brand is growing into a wider umbrella.
 - Home screen icon: sage V and TEAM on white with a sage border.
-- No initial bubble beside the name. Read status shown apart from the author's name ("By Alex").
+- No initial bubble beside the name. Read status shown apart from the author's name ("By [first name]").
 - Swipe to go back is preferred over a top-left arrow.
 - Photos are stored inside the Sheet, to avoid a Drive permission.
 - Bulletins as compact rows (a change from the original spec; the owner agreed, and may revisit after real use).
