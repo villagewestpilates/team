@@ -215,7 +215,7 @@
 
   /** Big card for a post that still needs to be read. */
   function unreadCard(p) {
-    return '<article class="card post-card" data-open="' + esc(p.id) + '">' +
+    return '<article class="card post-card" data-open="' + esc(p.id) + '" role="button" tabindex="0" onclick="">' +
       '<div class="card-top">' + catTag(p) + statusPill(p) + '</div>' +
       '<div class="card-main"><div class="card-main-text"><h3 class="card-title">' + esc(p.title) + '</h3>' +
       extras(p) +
@@ -249,7 +249,7 @@
 
     if (unread.length) {
       var due = unread[0].readBy;
-      html += '<section class="todo" data-start="1">' +
+      html += '<section class="todo" data-start="1" role="button" tabindex="0" onclick="">' +
         '<div class="todo-text"><div class="todo-count">' + unread.length + (unread.length === 1 ? ' post to read' : ' posts to read') + '</div>' +
         '<div class="todo-sub">' + (due ? 'Earliest due ' + fullDate(due) : 'Takes about a minute each') + '</div></div>' +
         '<button class="btn-start" data-start="1">Start</button>' +

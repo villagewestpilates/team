@@ -33,3 +33,6 @@ Read this first, then the owner's original build prompt (they will paste it). No
 
 ## Owner preferences
 Not technical. Plain English, click-by-click steps, short answers, one recommendation. Stop at the end of each stage for an OK. No team emails until told "go"; test emails only to the owner's personal address given in the original prompt.
+
+## Publishing the front end
+Bump the number in `version.json` on every publish. index.html reads it uncached and loads app.css, icons.js and app.js with that number, so phones pick up changes the next time the app opens. Do not add static script or stylesheet tags back into index.html.
