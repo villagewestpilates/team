@@ -20,7 +20,7 @@
     view: 'tab',            // 'tab' | 'post' | 'done'
     postId: '',             // open post
     flow: null,             // { total, done, justRead: [ids] } while reading through unread posts
-    canPost: false, people: [], defaultCategory: '', draft: null, photos: {}, readers: null, team: null, personForm: null, catForm: null,
+    canPost: false, people: [], defaultCategory: '', draft: null, photos: {}, readers: null, team: null, personForm: null, catForm: null, resources: [], contacts: [], resSearch: '', resForm: null,
     filter: 'all', search: '', lastSeen: lsGet('vwp.seen'), holdFor: '',
     loadedAt: 0
   };
@@ -161,6 +161,8 @@
     state.canPost = !!res.canPost;
     state.people = res.people || [];
     state.defaultCategory = res.defaultCategory || '';
+    state.resources = res.resources || [];
+    state.contacts = res.contacts || [];
     // Keep any read we marked locally that the server has not echoed back yet.
     var pending = {};
     state.posts.forEach(function (p) { if (p._pending) pending[p.id] = p.readAt; });
@@ -402,7 +404,7 @@
     } else if (state.view === 'done') {
       html = renderDone();
     } else {
-      html = state.tab === 'home' ? renderHome() : state.tab === 'bulletins' ? renderBulletins() : state.tab === 'team' && state.me.role === 'admin' ? renderTeam() : renderSoon();
+      html = state.tab === 'home' ? renderHome() : state.tab === 'bulletins' ? renderBulletins() : state.tab === 'team' && state.me.role === 'admin' ? renderTeam() : state.tab === 'resources' ? renderResources() : state.tab === 'contact' ? renderContact() : renderSoon();
       if (state.canPost && (state.tab === 'home' || state.tab === 'bulletins')) {
         html += '<button class="fab" data-compose="new">' + icon('plus') + 'New post</button>';
       }
@@ -516,7 +518,7 @@
 
   function saveLocalSnapshot() {
     saveCache({ ok: true, me: state.me, settings: state.settings, categories: state.categories,
-      canPost: state.canPost, people: state.people, defaultCategory: state.defaultCategory,
+      canPost: state.canPost, people: state.people, defaultCategory: state.defaultCategory, resources: state.resources, contacts: state.contacts,
       posts: state.posts.map(function (p) { var c = Object.assign({}, p); delete c._pending; return c; }) });
   }
 
@@ -810,6 +812,7 @@
   function sheetAction(what, arg) {
     if (what === 'close') return closeSheet();
     if (teamSheetAction(what, arg)) return;
+    if (what === 'saveres' || what === 'removeres') return saveResource(what === 'removeres');
     if (what === 'leave') { closeSheet(); return closeCompose(); }
     if (what === 'post') return sendPost('');
     if (what === 'small' || what === 'real') return sendPost(what);
@@ -1128,8 +1131,21 @@
   }
 
   function stage4Click(e) {
-    var t = e.target.closest('[data-readers],[data-nudge],[data-person-open],[data-person-add],[data-cat-open],[data-setting],[data-teamreload],[data-prole],[data-papp],[data-swatch]');
+    var t = e.target.closest('[data-res-edit],[data-res-add],[data-res-clear],[data-rsec],[data-raud],[data-readers],[data-nudge],[data-person-open],[data-person-add],[data-cat-open],[data-setting],[data-teamreload],[data-prole],[data-papp],[data-swatch]');
     if (!t) return false;
+    if (t.hasAttribute('data-res-edit')) return resForm(t.getAttribute('data-res-edit')), true;
+    if (t.hasAttribute('data-res-add')) return resForm(''), true;
+    if (t.hasAttribute('data-res-clear')) { state.resSearch = ''; render(); return true; }
+    if (t.hasAttribute('data-rsec')) {
+      state.resForm.section = t.getAttribute('data-rsec'); document.getElementById('rf-newsec').value = '';
+      [].forEach.call(document.querySelectorAll('#rf-secs .chip'), function (b) { b.classList.toggle('on', b === t); });
+      return true;
+    }
+    if (t.hasAttribute('data-raud')) {
+      state.resForm.audience = t.getAttribute('data-raud');
+      [].forEach.call(document.querySelectorAll('#rf-aud .seg-btn'), function (b) { b.classList.toggle('on', b === t); });
+      return true;
+    }
     if (t.hasAttribute('data-readers')) { if (t.hasAttribute('data-reload')) { loadReaders(state.postId); render(); } else openReaders(t.getAttribute('data-readers')); }
     else if (t.hasAttribute('data-nudge')) nudge(t.getAttribute('data-nudge'));
     else if (t.hasAttribute('data-person-open')) personSheet(t.getAttribute('data-person-open'));
@@ -1156,6 +1172,110 @@
     return true;
   }
 
+
+  /* ---------- Resources ---------- */
+
+  var AUD_WORDS = { everyone: 'Everyone', apprentices: 'Apprentices', admins: 'Admins' };
+  function resIcon(r) {
+    var u = r.url, t = (r.title + ' ' + r.section).toLowerCase();
+    if (/docs\.google\.com\/forms|forms\.gle/.test(u) || /\b(form|quiz|sign up)\b/.test(t)) return 'clipboard-list';
+    if (/\/spreadsheets\//.test(u)) return 'sheet';
+    if (/\/folders\//.test(u) || /\bdrive\b/.test(r.title.toLowerCase())) return 'folder';
+    if (/video|recording/.test(t)) return 'circle-play';
+    if (/docs\.google\.com\/document|drive\.google\.com\/file/.test(u)) return 'file-text';
+    return 'external-link';
+  }
+  function sections() {
+    var out = [];
+    state.resources.forEach(function (r) { if (out.indexOf(r.section) === -1) out.push(r.section); });
+    return out;
+  }
+  function resourceList() {
+    var admin = state.me.role === 'admin', q = state.resSearch.trim().toLowerCase();
+    var list = state.resources.filter(function (r) { return !q || (r.title + ' ' + r.section).toLowerCase().indexOf(q) !== -1; });
+    if (!list.length) {
+      return '<div class="empty"><div class="bubble sm">' + icon(q ? 'search' : 'layout-grid') + '</div><div class="calm-title">' + (q ? 'Nothing matches' : 'No resources yet') + '</div>' +
+        '<div class="calm-sub">' + (q ? 'Try a shorter word.' : 'Forms, documents, and links will show up here.') + '</div>' + (q ? '<button class="btn btn-outline sm" data-res-clear="1">Show everything</button>' : '') + '</div>';
+    }
+    var html = '';
+    sections().forEach(function (sec) {
+      var rows = list.filter(function (r) { return r.section === sec; });
+      if (!rows.length) return;
+      html += '<h2 class="section-label">' + esc(sec) + '</h2><div class="rows-list">' + rows.map(function (r) {
+        var badge = admin && r.audience !== 'everyone' ? '<span class="badge soft">' + AUD_WORDS[r.audience] + ' only</span>' : '';
+        var edit = admin ? '<button class="res-edit" data-res-edit="' + esc(r.id) + '" aria-label="Edit ' + esc(r.title) + '">' + icon('pencil') + '</button>' : '';
+        if (!r.url) { // only admins ever receive these
+          return '<div class="res-item"><button class="res-row todo-link" data-res-edit="' + esc(r.id) + '">' + icon('link') +
+            '<span class="res-text"><span class="res-title">' + esc(r.title) + '</span><span class="res-sub"><span class="pill pill-coral">Needs a link</span>Hidden from the team until it has one</span></span></button></div>';
+        }
+        return '<div class="res-item"><a class="res-row" href="' + esc(safeUrl(r.url)) + '" target="_blank" rel="noopener">' + icon(resIcon(r)) +
+          '<span class="res-text"><span class="res-title">' + esc(r.title) + badge + '</span></span>' + (admin ? '' : icon('chevron-right')) + '</a>' + edit + '</div>';
+      }).join('') + '</div>';
+    });
+    return html;
+  }
+  function renderResources() {
+    return '<div class="screen"><h1 class="page-title">Resources</h1>' +
+      '<label class="search">' + icon('search') + '<input id="res-search" type="search" enterkeyhint="search" autocomplete="off" placeholder="Search resources" aria-label="Search resources" value="' + esc(state.resSearch) + '"></label>' +
+      (state.me.role === 'admin' ? '<button class="btn btn-outline" data-res-add="1" style="margin-top:14px">' + icon('plus') + 'Add a resource</button>' : '') +
+      '<div id="res-list">' + resourceList() + '</div></div>';
+  }
+
+  function resForm(id) {
+    var r = id ? state.resources.filter(function (x) { return x.id === id; })[0] : null;
+    var secs = sections();
+    state.resForm = { id: id || '', section: r ? r.section : (secs[0] || ''), audience: r ? r.audience : 'everyone' };
+    var f = state.resForm;
+    sheet('<h2>' + (r ? 'Edit resource' : 'Add a resource') + '</h2>' +
+      '<label class="lbl" for="rf-title" style="margin-top:6px">Name</label><input class="input" id="rf-title" maxlength="80" autocomplete="off" value="' + esc(r ? r.title : '') + '">' +
+      '<label class="lbl" for="rf-url">Link <span class="opt">leave empty to add later</span></label><input class="input" id="rf-url" inputmode="url" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="https://" value="' + esc(r ? r.url : '') + '">' +
+      '<div class="lbl">Section</div><div class="chips wrap" id="rf-secs">' + secs.map(function (x) { return '<button class="chip' + (f.section === x ? ' on' : '') + '" data-rsec="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') + '</div>' +
+      '<input class="input" id="rf-newsec" maxlength="40" autocomplete="off" placeholder="Or type a new section" style="margin-top:8px">' +
+      '<div class="lbl">Who sees it</div><div class="seg-group" id="rf-aud">' + ['everyone', 'apprentices', 'admins'].map(function (a) { return '<button class="seg-btn' + (f.audience === a ? ' on' : '') + '" data-raud="' + a + '">' + AUD_WORDS[a] + '</button>'; }).join('') + '</div>' +
+      '<button class="btn btn-primary" data-sheet="saveres" style="margin-top:14px">Save</button>' +
+      (r ? '<div class="sheet-links"><button class="red" data-sheet="removeres">Remove this resource</button></div>' : '') +
+      '<button class="btn btn-ghost" data-sheet="close">Cancel</button>');
+  }
+  var resBusy = false;
+  function saveResource(remove) {
+    var f = state.resForm; if (!f || resBusy) return;
+    var title = document.getElementById('rf-title').value.trim(), url = document.getElementById('rf-url').value.trim();
+    var section = document.getElementById('rf-newsec').value.trim() || f.section;
+    if (!title) return toast('Give it a name');
+    if (!section) return toast('Pick a section');
+    if (url && !/^https:\/\/\S+$/i.test(url)) return toast('Links need to start with https://');
+    resBusy = true;
+    api('saveResource', { resource: { id: f.id, title: title, url: url, section: section, audience: f.audience, archived: !!remove } }).then(function (res) {
+      resBusy = false;
+      if (!res || !res.ok) return toast((res && res.message) || 'That didn\'t save. Try again.');
+      state.resources = res.resources; saveLocalSnapshot(); closeSheet();
+      if (state.view === 'tab' && state.tab === 'resources') { var y = window.scrollY; render(); window.scrollTo(0, y); }
+      toast(remove ? 'Resource removed' : url ? 'Saved' : 'Saved. It stays hidden from the team until it has a link.');
+    }).catch(function () { resBusy = false; toast('That didn\'t save. Check your connection and try again.'); });
+  }
+
+  /* ---------- Contact ---------- */
+
+  function fmtPhone(p) {
+    var d = String(p).replace(/\D/g, '');
+    if (d.length === 11 && d.charAt(0) === '1') d = d.slice(1);
+    return d.length === 10 ? '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6) : String(p);
+  }
+  function renderContact() {
+    var first = state.contacts.filter(function (c) { return c.primary; })[0] || state.contacts[0];
+    var rest = state.contacts.filter(function (c) { return c !== first; });
+    if (!first) return '<div class="screen"><h1 class="page-title">Contact</h1><div class="empty"><div class="bubble sm">' + icon('message-circle') + '</div><div class="calm-title">No numbers yet</div></div></div>';
+    return '<div class="screen"><h1 class="page-title">Contact</h1>' +
+      '<section class="contact-main"><div class="bubble sm">' + icon('message-circle') + '</div>' +
+        '<div class="contact-main-title">' + esc(first.label || 'Text the studio') + '</div><div class="contact-num">' + esc(fmtPhone(first.phone)) + '</div>' +
+        '<p class="contact-note">The fastest way to reach us. Use it for client updates, schedule questions, or anything that looks off.</p>' +
+        '<a class="btn btn-primary" href="sms:' + esc(first.phone) + '" target="_blank" rel="noopener">' + icon('message-circle') + esc(first.label || 'Text the studio') + '</a></section>' +
+      (rest.length ? '<h2 class="section-label">Or text someone directly</h2><div class="rows-list">' + rest.map(function (c) {
+        return '<div class="person-row"><span class="person-row-text"><span class="person-name">' + esc(c.name) + '</span><span class="person-sub">' + esc(fmtPhone(c.phone)) + '</span></span>' +
+          '<a class="mini-btn" href="sms:' + esc(c.phone) + '" target="_blank" rel="noopener" aria-label="' + esc(c.label || 'Text ' + c.name) + '">Text</a></div>';
+      }).join('') + '</div>' : '') + '</div>';
+  }
+
   /* ---------- Events ---------- */
 
   document.addEventListener('click', function (e) {
@@ -1177,6 +1297,7 @@
 
   document.addEventListener('input', function (e) {
     if (composeInput(e)) return;
+    if (e.target.id === 'res-search') { state.resSearch = e.target.value; var rl = document.getElementById('res-list'); if (rl) rl.innerHTML = resourceList(); return; }
     if (e.target.id !== 'search') return;
     state.search = e.target.value;
     var list = document.getElementById('list');
@@ -1235,7 +1356,7 @@
         '<div class="bubble">' + icon('link') + '</div>' +
         '<h1>This link didn\'t work</h1>' +
         '<p>Open your personal link again, or ask Barbara to resend it.</p>' +
-        '<a class="btn btn-outline" href="sms:+14432779647" target="_blank" rel="noopener">' + icon('message-circle') + 'Text Barbara</a>' +
+        '<a class="btn btn-outline" href="sms:+14437025786" target="_blank" rel="noopener">' + icon('message-circle') + 'Text the studio</a>' +
       '</div>';
   }
 
