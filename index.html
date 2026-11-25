@@ -15,14 +15,38 @@
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="preload" href="fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="app.css?v=11">
 </head>
 <body>
 <div id="app" aria-live="polite"></div>
 <nav id="tabbar" class="tabbar" hidden></nav>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <noscript><p style="padding:24px;font-family:sans-serif">This app needs JavaScript turned on.</p></noscript>
-<script src="icons.js?v=11"></script>
-<script src="app.js?v=11"></script>
+<script>
+/* Loads the newest app files. version.json is never cached, so an update shows up the next time the app opens. */
+(function () {
+  var d = document, done = false, last = '';
+  try { last = localStorage.getItem('vwp.v') || ''; } catch (e) {}
+  function add(tag, attrs, parent, next) {
+    var el = d.createElement(tag), fired = false;
+    function go() { if (!fired) { fired = true; if (next) next(); } }
+    for (var k in attrs) el[k] = attrs[k];
+    el.onload = go; el.onerror = go;
+    parent.appendChild(el);
+    if (next) setTimeout(go, 4000);
+  }
+  function start(v) {
+    if (done) return; done = true;
+    try { localStorage.setItem('vwp.v', v); } catch (e) {}
+    add('link', { rel: 'stylesheet', href: 'app.css?v=' + v }, d.head, function () {
+      add('script', { src: 'icons.js?v=' + v }, d.body, function () { add('script', { src: 'app.js?v=' + v }, d.body); });
+    });
+  }
+  fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
+    .then(function (r) { return r.json(); })
+    .then(function (j) { start(String(j.v)); })
+    .catch(function () { start(last || '12'); });
+  setTimeout(function () { start(last || '12'); }, 2500);
+})();
+</script>
 </body>
 </html>
