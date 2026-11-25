@@ -414,7 +414,7 @@
       var more = f && f.done + 1 < f.total;
       foot = '<div class="readbar"><div class="readbar-in"><div class="readbar-row">' + backBtn +
         '<button class="btn btn-primary' + (hold ? ' holding' : '') + '" id="markread"' + (hold ? ' disabled data-hold="1"' : '') + '>' + icon('check') + esc(p.buttonText || 'Mark as read') + '</button></div>' +
-        '<p class="readbar-note">Tapping this confirms you\'ve read and understood it.' + (more ? ' Then you\'ll go to the next one.' : '') + '</p>' +
+        '<p class="readbar-note" id="readnote">This tells the studio you\'ve read it.' + (more ? ' Then you\'ll go to the next one.' : '') + '</p>' +
       '</div></div>';
     } else {
       foot = '<div class="readbar quiet"><div class="readbar-in"><div class="readbar-row">' + backBtn +
@@ -576,44 +576,40 @@
   }
 
   var marking = false;
+  /** A post only counts as read once the server has saved it. Nothing moves on until then. */
   function markRead() {
     var p = byId(state.postId);
     if (!p || marking || !isUnread(p)) return;
     marking = true;
     var btn = document.getElementById('markread');
-    if (btn) btn.disabled = true;
-    // Show it as read straight away, then save. If saving fails, put it back.
-    p.readAt = new Date().toISOString();
-    p._pending = true;
-    var f = state.flow || (state.flow = { total: 1, done: 0, justRead: [] });
-    f.justRead.push(p.id);
-    f.done += 1;
-    toast('Marked as read');
-    var failed = false, advanced = false;
-    api('markRead', { postId: p.id }).then(function (res) {
-      if (!res || !res.ok) throw new Error('not saved');
-      p.readAt = res.readAt || p.readAt;
-      p._pending = false;
-      saveLocalSnapshot();
-    }).catch(function () {
-      // Put the post back exactly as it was so nothing looks read that isn't.
-      failed = true;
-      p.readAt = ''; p._pending = false;
-      f.justRead = f.justRead.filter(function (x) { return x !== p.id; });
-      f.done = Math.max(0, f.done - 1);
-      toast('That didn\'t save. Check your connection and try again.');
-      if (!advanced) { marking = false; render(); }
-      else if (state.view === 'done') { state.flow = null; openPost(p.id, { replace: true, anim: 'fade' }); }
-      else render();
-    });
-    setTimeout(function () {
-      if (failed) return;
-      advanced = true;
+    var note = document.getElementById('readnote');
+    var noteWas = note ? note.textContent : '';
+    if (btn) { btn.disabled = true; btn.setAttribute('aria-busy', 'true'); }
+    if (note) { note.className = 'readbar-note'; note.removeAttribute('role'); note.textContent = 'Saving\u2026'; }
+    var onPost = function () { return state.view === 'post' && state.postId === p.id; };
+    api('markRead', { postId: p.id }, 15000).then(function (res) {
+      if (!res || !res.ok) { var e = new Error('not saved'); e.message2 = res && res.message; throw e; }
       marking = false;
+      p.readAt = res.readAt || new Date().toISOString();
+      var f = state.flow || (state.flow = { total: 1, done: 0, justRead: [] });
+      f.justRead.push(p.id);
+      f.done += 1;
+      saveLocalSnapshot();
+      toast('Marked as read');
+      // If they left the post while it was saving, just keep what they are looking at up to date.
+      if (!onPost()) { if (state.view === 'tab') render(); return; }
       var next = unreadQueue()[0];
       if (next) openPost(next.id, { keepFlow: true, replace: true, anim: 'slide' });
       else showDone();
-    }, 380);
+    }).catch(function (err) {
+      marking = false;
+      var msg = (err && err.message2) || 'That didn\'t save, so it isn\'t marked as read yet. Check your connection and tap again.';
+      if (!onPost()) { toast(msg); return; }
+      var b = document.getElementById('markread'), n = document.getElementById('readnote');
+      if (b) { b.disabled = false; b.removeAttribute('aria-busy'); }
+      if (n) { n.className = 'readbar-note err'; n.setAttribute('role', 'alert'); n.textContent = msg; }
+      else toast(msg);
+    });
   }
 
   function saveLocalSnapshot() {
@@ -1142,17 +1138,20 @@
       '<div class="readbar quiet"><div class="readbar-in"><div class="readbar-row"><button class="bar-back" data-back="1" aria-label="Back">' + icon('chevron-left') + '</button><button class="back-text" data-back="1">Back to the post</button></div></div></div>';
   }
 
+  var nudging = false;
   function nudge(who) {
-    var r = state.readers; if (!r || !r.groups) return;
+    var r = state.readers; if (!r || !r.groups || nudging) return;
+    nudging = true;
     var ids = who === 'all' ? r.groups.opened.concat(r.groups.notOpened).map(function (x) { return x.id; }) : [who];
     api('nudge', { postId: state.postId, ids: ids }).then(function (res) {
+      nudging = false;
       if (!res || !res.ok) return toast((res && res.message) || 'That didn\'t send.');
       if (res.mode === 'test') return toast('Test nudge sent to the test address only. The team got nothing.');
       var now = new Date().toISOString(), g = state.readers && state.readers.groups;
       if (g) g.opened.concat(g.notOpened).forEach(function (x) { if ((res.nudged || []).indexOf(x.id) !== -1) x.nudgedAt = now; });
       if (state.view === 'readers') { var y = window.scrollY; render(); window.scrollTo(0, y); }
       toast(res.sent === 1 ? 'Nudge sent' : 'Nudged ' + res.sent + ' people');
-    }).catch(function () { toast('That didn\'t send. Check your connection.'); });
+    }).catch(function () { nudging = false; toast('That didn\'t send. Check your connection.'); });
   }
 
   /* ---------- Team screen (admins) ---------- */
@@ -1315,16 +1314,20 @@
     }).catch(function () { teamBusy = false; toast('That didn\'t work. Check your connection and try again.'); });
   }
 
+  var emailingLink = false;
   function teamSheetAction(what, arg) {
     var x = arg ? person(arg) : null, first = x ? x.firstName : '';
     if (what === 'copy') { copyText(linkFor(x)).then(function () { toast('Link copied. Paste it into a text or email to ' + first + '.'); }, function () { toast('Couldn\'t copy. Press and hold the link to copy it.'); }); return true; }
     if (what === 'emaillink') {
+      if (emailingLink) return true;
+      emailingLink = true;
       api('emailLink', { id: arg }).then(function (res) {
+        emailingLink = false;
         if (!res || !res.ok) return toast((res && res.message) || 'That didn\'t send.');
         applyTeam(res);
         toast(res.mode === 'test' ? 'Test email sent to the test address only. ' + first + ' got nothing.' : 'Link emailed to ' + first);
         if (res.mode !== 'test') personSheet(arg);
-      }).catch(function () { toast('That didn\'t send.'); });
+      }).catch(function () { emailingLink = false; toast('That didn\'t send.'); });
       return true;
     }
     if (what === 'golive') { closeSheet(); setEmailMode('live'); return true; }
@@ -1649,7 +1652,7 @@
       '<div class="center full">' +
         '<div class="bubble">' + icon('link') + '</div>' +
         '<h1>This link didn\'t work</h1>' +
-        '<p>Open your personal link again, or ask Barbara to resend it.</p>' +
+        '<p>Open your personal link again, or ask the studio to send you a new one.</p>' +
         '<a class="btn btn-outline" href="sms:+14437025786" target="_blank" rel="noopener">' + icon('message-circle') + 'Text the studio</a>' +
       '</div>';
   }

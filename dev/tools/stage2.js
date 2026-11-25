@@ -151,11 +151,24 @@ const log = [];
   await s.page.waitForTimeout(1500);
   await shot(s.page, '11-save-failed');
   check('failed save: still on the post, button back', !!(await s.page.$('#markread:not([disabled])')) && (await s.page.textContent('.progress-text')) === '1 of 1 to read', await s.page.evaluate(() => document.body.innerText.slice(0, 60)));
+  check('failed save: the reason shows at the button', await s.page.$eval('#readnote', n => n.classList.contains('err') && n.getAttribute('role') === 'alert' && n.textContent.includes('isn\'t marked as read yet')));
   await s.page.click('[data-back]'); await s.page.waitForTimeout(400);
   check('failed save: post is still unread on Home', !!(await s.page.$('.post-card')));
   await s.ctx.close();
 
-  // 3b. Saving fails after a slow wait (already moved on to "caught up").
+  // 3a. A slow save: nothing moves on, and nothing looks read, until the server has answered.
+  s = await session(fullSet().slice(1, 2), { delay: 1200 });
+  await s.page.goto(base + '?k=' + K); await s.page.waitForSelector('.post-card');
+  await s.page.click('[data-open]'); await s.page.waitForSelector('#markread');
+  check('reading note uses the agreed wording', (await s.page.textContent('#readnote')).startsWith('This tells the studio you\'ve read it.') && !/confirm/i.test(await s.page.textContent('.readbar')));
+  await s.page.waitForTimeout(1400); await s.page.click('#markread'); await s.page.waitForTimeout(500);
+  check('slow save: still on the post and saving, not shown as read', !!(await s.page.$('#markread[disabled]')) && (await s.page.textContent('#readnote')) === 'Saving\u2026' && !(await s.page.$('.done')));
+  await s.page.evaluate(() => { const b = document.getElementById('markread'); b.disabled = false; b.click(); b.click(); });
+  await s.page.waitForSelector('.done', { timeout: 4000 });
+  check('slow save: moves on once saved, and only one save was sent', s.calls.filter(c => c === 'markRead').length === 1, String(s.calls.filter(c => c === 'markRead').length));
+  await s.ctx.close();
+
+  // 3b. Saving fails after a slow wait: still on the post, with the button back.
   s = await session(fullSet().slice(1, 2), { failMark: true, delay: 1500 });
   await s.page.goto(base + '?k=' + K); await s.page.waitForSelector('.post-card');
   await s.page.click('[data-open]'); await s.page.waitForSelector('#markread'); await s.page.click('#markread');

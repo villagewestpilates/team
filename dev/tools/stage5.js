@@ -97,7 +97,9 @@ const visible = (all, role, apprentice) => all.filter(r => !r.archived && (role 
   await p0.goto(base); await p0.waitForSelector('.center h1');
   check('link problem screen offers Text the studio', (await p0.textContent('.center .btn')).trim() === 'Text the studio');
   const src = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
-  check('no personal phone numbers in the public app files', !/4432779647|4439523299|2146041708/.test(src));
+  check('link problem screen names no one', (await p0.textContent('.center p')).trim() === 'Open your personal link again, or ask the studio to send you a new one.');
+  const phones = (src.match(/\+?1?\d{10}\b/g) || []).filter(n => !/4437025786$/.test(n));
+  check('the studio line is the only phone number in the public app files', phones.length === 0, phones.length + ' other number(s)');
   await ctx.close();
   console.log(log.join('\n')); await browser.close(); server.close();
 })().catch(e => { console.log(log.join('\n')); console.error(e); process.exit(1); });
