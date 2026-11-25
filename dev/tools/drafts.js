@@ -92,6 +92,16 @@ const base0 = { categoryId: 'c', pinned: false, needsRead: true, readBy: '', eve
   await shot('05-scheduled-list');
   const dst = await page.evaluate(() => { const f = window.__vwpTest; return f ? [f('2027-07-04T06:00'), f('2027-01-04T06:00')] : null; });
   check('summer and winter times both convert correctly', dst && dst[0] === '2027-07-04T10:00:00.000Z' && dst[1] === '2027-01-04T11:00:00.000Z', JSON.stringify(dst));
+  // --- Scheduling can be reached from the review step ---
+  await page.tap('.fab'); await page.waitForSelector('#f-title');
+  await page.fill('#f-title', 'From review'); await page.fill('#f-body', 'Body');
+  await page.tap('[data-submit]'); await page.waitForSelector('.sheet');
+  check('review shows the category and offers Schedule for later', (await page.textContent('.sheet')).includes('CategoryAnnouncements') && !!(await page.$('[data-sheet=\"picklater\"]')));
+  await page.screenshot({ path: require('path').join(OUT, '06-review-with-schedule.png') });
+  await page.tap('[data-sheet=\"picklater\"]'); await page.waitForSelector('#f-when'); await page.waitForTimeout(300);
+  check('Schedule for later jumps to the date and time, text kept', (await page.inputValue('#f-title')) === 'From review' && !!(await page.$('[data-when=\"later\"].on')) && (await page.textContent('[data-submit]')) === 'Review and schedule');
+  await page.tap('[data-back]'); await page.waitForSelector('.todo, .calm, #search'); await page.evaluate(() => localStorage.removeItem('vwp.draft'));
+  await page.tap('[data-tab=\"bulletins\"]'); await page.waitForSelector('.pending-row');
   // --- Post a scheduled one now ---
   await page.tap('.pending-row'); await page.waitForSelector('#f-title');
   check('scheduled post reopens with Later selected', !!(await page.$('[data-when="later"].on')) && (await page.inputValue('#f-when')) === '2027-01-04T06:00');
