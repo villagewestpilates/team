@@ -20,6 +20,7 @@
     view: 'tab',            // 'tab' | 'post' | 'done'
     postId: '',             // open post
     flow: null,             // { total, done, justRead: [ids] } while reading through unread posts
+    canPost: false, people: [], defaultCategory: '', draft: null, photos: {},
     filter: 'all', search: '', lastSeen: lsGet('vwp.seen'), holdFor: '',
     loadedAt: 0
   };
@@ -143,6 +144,9 @@
     state.me = res.me;
     state.settings = res.settings || state.settings;
     state.categories = res.categories || [];
+    state.canPost = !!res.canPost;
+    state.people = res.people || [];
+    state.defaultCategory = res.defaultCategory || '';
     // Keep any read we marked locally that the server has not echoed back yet.
     var pending = {};
     state.posts.forEach(function (p) { if (p._pending) pending[p.id] = p.readAt; });
@@ -331,10 +335,13 @@
     }
 
     return '<div class="screen post-screen' + (foot ? ' has-bar' : '') + '">' +
-      '<div class="post-top"><button class="back" data-back="1" aria-label="Back">' + icon('chevron-left') + '</button>' + progress + '<span class="back-spacer"></span></div>' +
+      '<div class="post-top"><button class="back" data-back="1" aria-label="Back">' + icon('chevron-left') + '</button>' + progress +
+        (p.canEdit ? '<button class="back" data-edit="' + esc(p.id) + '" aria-label="Edit this post">' + icon('pencil') + '</button>' : '<span class="back-spacer"></span>') + '</div>' +
       '<div class="card-top">' + catTag(p) + (unread || p.readAt ? statusPill(p) : '') + '</div>' +
       '<h1 class="post-title">' + esc(p.title) + '</h1>' +
       '<div class="meta">' + metaLine(p) + '</div>' + extras(p) +
+      (p.stats && p.needsRead ? '<div class="stats">' + icon('users') + p.stats.read + ' of ' + p.stats.total + ' read</div>' : '') +
+      (p.photo ? '<button class="photo" data-photo="' + esc(p.id) + '" aria-label="See the photo full size" style="aspect-ratio:' + p.photo.w + '/' + p.photo.h + '"><span class="sk"></span></button>' : '') +
       '<div class="post-body">' + linkify(p.body) + '</div>' +
       (links ? '<div class="links">' + links + '</div>' : '') +
     '</div>' + foot;
@@ -373,10 +380,15 @@
       var p = byId(state.postId);
       if (!p) { state.view = 'tab'; return render(); }
       html = renderPost(p);
+    } else if (state.view === 'compose' && state.draft) {
+      html = renderCompose();
     } else if (state.view === 'done') {
       html = renderDone();
     } else {
       html = state.tab === 'home' ? renderHome() : state.tab === 'bulletins' ? renderBulletins() : renderSoon();
+      if (state.canPost && (state.tab === 'home' || state.tab === 'bulletins')) {
+        html += '<button class="fab" data-compose="new">' + icon('plus') + 'New post</button>';
+      }
     }
     app.innerHTML = html;
     // A soft white veil fades away over the new screen. The text itself never animates,
@@ -384,7 +396,8 @@
     if (anim) { veil.classList.remove('go'); void veil.offsetWidth; veil.classList.add('go'); }
     var held = document.querySelector('#markread[data-hold]');
     if (held) setTimeout(function () { held.disabled = false; held.classList.remove('holding'); }, 3000);
-    tabbar.hidden = state.view === 'post';
+    tabbar.hidden = state.view === 'post' || state.view === 'compose';
+    if (state.view === 'post') loadPhoto(state.postId);
     if (!tabbar.hidden) renderTabbar();
   }
 
@@ -485,19 +498,369 @@
 
   function saveLocalSnapshot() {
     saveCache({ ok: true, me: state.me, settings: state.settings, categories: state.categories,
+      canPost: state.canPost, people: state.people, defaultCategory: state.defaultCategory,
       posts: state.posts.map(function (p) { var c = Object.assign({}, p); delete c._pending; return c; }) });
+  }
+
+
+  /* ---------- Photos ---------- */
+
+  function loadPhoto(id) {
+    var p = byId(id), box = app.querySelector('.photo[data-photo]');
+    if (!p || !p.photo || !box) return;
+    function show(src) {
+      var now = app.querySelector('.photo[data-photo="' + id + '"]');
+      if (now) now.innerHTML = '<img src="' + src + '" alt="Photo for this post">';
+    }
+    if (state.photos[id]) return show(state.photos[id]);
+    api('getPhoto', { postId: id }).then(function (res) {
+      if (!res || !res.ok) throw new Error('no photo');
+      state.photos[id] = res.data;
+      show(res.data);
+    }).catch(function () {
+      var now = app.querySelector('.photo[data-photo="' + id + '"]');
+      if (now) now.innerHTML = '<span class="photo-fail">' + icon('refresh-cw') + 'Photo didn\'t load. Tap to try again.</span>';
+    });
+  }
+
+  function showPhotoFull(src) {
+    var v = document.createElement('div');
+    v.className = 'viewer';
+    v.innerHTML = '<button class="viewer-close" aria-label="Close photo">' + icon('x') + '</button><img src="' + src + '" alt="Photo for this post">';
+    v.addEventListener('click', function (e) { if (e.target.tagName !== 'IMG') v.remove(); });
+    document.body.appendChild(v);
+  }
+
+  /** Shrinks a chosen photo in the browser so posts stay quick to load. */
+  function shrinkPhoto(file) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        try {
+          var tries = [[1280, 0.72], [1100, 0.62], [900, 0.55]], out = null;
+          for (var i = 0; i < tries.length; i++) {
+            var scale = Math.min(1, tries[i][0] / Math.max(img.naturalWidth, img.naturalHeight));
+            var w = Math.max(1, Math.round(img.naturalWidth * scale)), h = Math.max(1, Math.round(img.naturalHeight * scale));
+            var c = document.createElement('canvas'); c.width = w; c.height = h;
+            var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
+            out = { data: c.toDataURL('image/jpeg', tries[i][1]), w: w, h: h };
+            if (out.data.length < 420000) break;
+          }
+          URL.revokeObjectURL(url);
+          resolve(out);
+        } catch (err) { reject(err); }
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('unreadable')); };
+      img.src = url;
+    });
+  }
+
+  /* ---------- Writing and editing a post ---------- */
+
+  var DRAFT_KEY = 'vwp.draft';
+  function blankDraft() {
+    return { id: '', title: '', body: '', categoryId: state.defaultCategory || (state.categories[0] || {}).id || '',
+      pinned: false, needsRead: true, readBy: '', audience: 'everyone', audienceIds: [], buttonText: '',
+      links: [{ label: '', url: '' }, { label: '', url: '' }], eventDate: '', skipEmail: false,
+      photo: null, hasPhoto: false, removePhoto: false, more: false, dirty: false };
+  }
+  function saveDraft() {
+    var d = state.draft;
+    if (!d || d.id) return; // only brand-new posts are kept as a draft
+    var copy = Object.assign({}, d); copy.photo = null; // photos are too big to keep here
+    lsSet(DRAFT_KEY, JSON.stringify(copy));
+  }
+  function isPromo(id) { return /promo|event/i.test(id + ' ' + cat(id).name); }
+
+  function openCompose(id) {
+    if (!state.canPost) return;
+    var d = blankDraft();
+    if (id) {
+      var p = byId(id);
+      if (!p || !p.canEdit) return;
+      Object.assign(d, { id: p.id, title: p.title, body: p.body, categoryId: p.categoryId, pinned: p.pinned,
+        needsRead: p.needsRead, readBy: p.readBy, audience: p.audience || 'everyone', audienceIds: (p.audienceIds || []).slice(),
+        buttonText: p.buttonText, eventDate: p.eventDate, skipEmail: !!p.skipEmail, hasPhoto: !!p.photo });
+      (p.links || []).forEach(function (l, i) { if (i < 2) d.links[i] = { label: l.label, url: l.url }; });
+      d.more = !!(d.buttonText || d.links[0].url || d.pinned || d.skipEmail);
+    } else {
+      try { var saved = JSON.parse(lsGet(DRAFT_KEY) || 'null'); if (saved && (saved.title || saved.body)) { d = Object.assign(d, saved); d.restored = true; } } catch (e) {}
+    }
+    state.draft = d; state.view = 'compose';
+    pushRoute('#/compose');
+    render('fade');
+    window.scrollTo(0, 0);
+    if (d.restored) { d.restored = false; toast('We kept your draft from last time'); }
+  }
+
+  function leaveCompose() {
+    var d = state.draft;
+    if (d && d.id && d.dirty) {
+      return sheet('<h2>Leave without saving?</h2><p>Your changes to this post will be lost.</p>' +
+        '<button class="btn btn-primary" data-sheet="leave">Leave</button><button class="btn btn-ghost" data-sheet="close">Keep editing</button>');
+    }
+    closeCompose();
+  }
+  function closeCompose() {
+    var d = state.draft; state.draft = null;
+    if (d && d.id && byId(d.id)) { state.view = 'post'; state.postId = d.id; replaceRoute('#/post/' + d.id); render('fade'); }
+    else goTab(state.tab === 'bulletins' ? 'bulletins' : 'home', false);
+    window.scrollTo(0, 0);
+  }
+
+  function toggle(key, on, label, hint) {
+    return '<button class="switch-row" role="switch" aria-checked="' + !!on + '" data-toggle="' + key + '">' +
+      '<span class="switch-text"><span class="switch-label">' + label + '</span>' + (hint ? '<span class="switch-hint">' + hint + '</span>' : '') + '</span>' +
+      '<span class="switch' + (on ? ' on' : '') + '"><span></span></span></button>';
+  }
+  function audienceCount(d) {
+    if (d.audience === 'apprentices') return state.people.filter(function (x) { return x.apprentice; }).length;
+    if (d.audience === 'people') return d.audienceIds.length;
+    return state.people.length;
+  }
+  function audienceWords(d) {
+    var n = audienceCount(d);
+    if (d.audience === 'apprentices') return 'Apprentices (' + n + (n === 1 ? ' person)' : ' people)');
+    if (d.audience === 'people') {
+      var names = state.people.filter(function (x) { return d.audienceIds.indexOf(x.id) !== -1; }).map(function (x) { return x.firstName; });
+      return names.length <= 3 ? names.join(', ') : names.slice(0, 2).join(', ') + ' and ' + (names.length - 2) + ' more';
+    }
+    return 'Everyone (' + n + ' people)';
+  }
+
+  function photoField(d) {
+    if (d.photo) return '<div class="photo-pick has"><img src="' + d.photo.data + '" alt="Chosen photo"><button class="photo-x" data-rmphoto="1" aria-label="Remove photo">' + icon('x') + '</button></div>';
+    if (d.hasPhoto && !d.removePhoto) {
+      return '<div class="photo-pick has">' + (state.photos[d.id] ? '<img src="' + state.photos[d.id] + '" alt="Current photo">' : '<div class="photo-note">This post has a photo.</div>') +
+        '<button class="photo-x" data-rmphoto="1" aria-label="Remove photo">' + icon('x') + '</button></div>';
+    }
+    return '<button class="photo-pick" data-addphoto="1">' + icon('plus') + '<span>Add a photo</span><small>Optional. One per post.</small></button>';
+  }
+
+  function renderCompose() {
+    var d = state.draft, editing = !!d.id;
+    var cats = state.categories.map(function (c) {
+      var on = d.categoryId === c.id;
+      return '<button class="chip' + (on ? ' on' : '') + '" data-cat="' + esc(c.id) + '" aria-pressed="' + on + '"><span class="dot" style="background:' + esc(c.color) + '"></span>' + esc(c.name) + '</button>';
+    }).join('');
+    var auds = [['everyone', 'Everyone'], ['apprentices', 'Apprentices'], ['people', 'Selected people']].map(function (a) {
+      var on = d.audience === a[0];
+      return '<button class="seg-btn' + (on ? ' on' : '') + '" data-aud="' + a[0] + '" aria-pressed="' + on + '">' + a[1] + '</button>';
+    }).join('');
+    var people = d.audience !== 'people' ? '' : '<div class="people">' + state.people.map(function (x) {
+      var on = d.audienceIds.indexOf(x.id) !== -1;
+      return '<button class="person' + (on ? ' on' : '') + '" data-person="' + esc(x.id) + '" aria-pressed="' + on + '"><span class="tick">' + (on ? icon('check') : '') + '</span>' + esc(x.name) + '</button>';
+    }).join('') + '</div>';
+    var today = dayKey(new Date());
+    var linkRows = d.links.map(function (l, i) {
+      return '<div class="pair"><input class="input" data-f="link' + i + 'label" maxlength="40" placeholder="Button label, like Sign up" value="' + esc(l.label) + '" aria-label="Link ' + (i + 1) + ' label">' +
+        '<input class="input" data-f="link' + i + 'url" inputmode="url" autocapitalize="off" autocorrect="off" placeholder="https://" value="' + esc(l.url) + '" aria-label="Link ' + (i + 1) + ' address"></div>';
+    }).join('');
+
+    return '<div class="screen compose">' +
+      '<div class="post-top"><button class="back" data-back="1" aria-label="Close">' + icon('x') + '</button>' +
+      '<div class="compose-head">' + (editing ? 'Edit post' : 'New post') + '</div><span class="back-spacer"></span></div>' +
+
+      '<label class="lbl" for="f-title">Title</label>' +
+      '<textarea class="input title-input" id="f-title" data-f="title" rows="1" maxlength="140" placeholder="What is this about?">' + esc(d.title) + '</textarea>' +
+
+      '<label class="lbl" for="f-body">Post</label>' +
+      '<textarea class="input body-input" id="f-body" data-f="body" rows="7" placeholder="Write it the way you\'d say it. Links you paste become tappable.">' + esc(d.body) + '</textarea>' +
+
+      '<div class="lbl">Photo</div><div id="photo-field">' + photoField(d) + '</div>' +
+      '<input type="file" id="photo-input" accept="image/*" hidden>' +
+
+      '<div class="lbl">Category</div><div class="chips wrap">' + cats + '</div>' +
+      (isPromo(d.categoryId) ? '<label class="lbl" for="f-event">Event or end date <span class="opt">optional</span></label><input class="input" type="date" id="f-event" data-f="eventDate" value="' + esc(d.eventDate) + '">' : '') +
+
+      '<div class="lbl">Who sees it</div><div class="seg-group">' + auds + '</div>' + people +
+
+      '<div class="group">' + toggle('needsRead', d.needsRead, 'Needs to be marked read', 'People tap "Mark as read" and you can see who has.') + '</div>' +
+      (d.needsRead ? '<label class="lbl" for="f-readby">Read by <span class="opt">optional</span></label><input class="input" type="date" id="f-readby" data-f="readBy" min="' + today + '" value="' + esc(d.readBy) + '">' : '') +
+
+      '<button class="more-btn" data-more="1" aria-expanded="' + !!d.more + '">' + (d.more ? 'Fewer options' : 'More options') + icon(d.more ? 'chevron-left' : 'chevron-right') + '</button>' +
+      (d.more ? '<div class="more">' +
+        '<div class="group">' + toggle('pinned', d.pinned, 'Pin to the top', 'Stays first in Bulletins until you unpin it.') +
+          toggle('skipEmail', d.skipEmail, 'Skip the email for this post', 'People will only see it when they open the app.') + '</div>' +
+        (d.needsRead ? '<label class="lbl" for="f-btn">Wording for the Mark as read button <span class="opt">optional</span></label><input class="input" id="f-btn" data-f="buttonText" maxlength="40" placeholder="Mark as read" value="' + esc(d.buttonText) + '">' : '') +
+        '<div class="lbl">Link buttons <span class="opt">up to two</span></div>' + linkRows +
+        (editing ? '<button class="danger-link" data-archive="1">Remove this post</button>' : '') +
+      '</div>' : '') +
+    '</div>' +
+    '<div class="readbar"><div class="readbar-in"><button class="btn btn-primary" data-submit="1">' + (editing ? 'Save changes' : 'Review and post') + '</button></div></div>';
+  }
+
+  function rerenderCompose() {
+    var y = window.scrollY;
+    render();
+    window.scrollTo(0, y);
+    grow(document.getElementById('f-title'));
+  }
+  function grow(el) { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }
+
+  function composeInput(e) {
+    var d = state.draft, f = e.target.getAttribute && e.target.getAttribute('data-f');
+    if (!d || !f) return false;
+    var v = e.target.value, m = /^link(\d)(label|url)$/.exec(f);
+    if (m) d.links[+m[1]][m[2]] = v; else d[f] = v;
+    d.dirty = true;
+    if (f === 'title') grow(e.target);
+    saveDraft();
+    return true;
+  }
+
+  document.addEventListener('change', function (e) {
+    if (e.target.id !== 'photo-input' || !state.draft) return;
+    var file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    var field = document.getElementById('photo-field');
+    if (field) field.innerHTML = '<div class="photo-pick busy"><span class="sk" style="position:absolute;inset:0;border-radius:18px"></span><span style="position:relative">Getting your photo ready</span></div>';
+    shrinkPhoto(file).then(function (out) {
+      if (!state.draft) return;
+      state.draft.photo = out; state.draft.removePhoto = false; state.draft.dirty = true;
+      var fld = document.getElementById('photo-field'); if (fld) fld.innerHTML = photoField(state.draft);
+    }).catch(function () {
+      var fld = document.getElementById('photo-field'); if (fld && state.draft) fld.innerHTML = photoField(state.draft);
+      toast('That file isn\'t a photo we can use. Try another one.');
+    });
+  });
+
+  function composeClick(e) {
+    var ph = e.target.closest('[data-photo]');
+    if (ph) {
+      var pid = ph.getAttribute('data-photo');
+      if (state.photos[pid]) showPhotoFull(state.photos[pid]); else { ph.innerHTML = '<span class="sk"></span>'; loadPhoto(pid); }
+      return;
+    }
+    var sh = e.target.closest('[data-sheet]');
+    if (sh) return sheetAction(sh.getAttribute('data-sheet'));
+    if (e.target.classList && e.target.classList.contains('sheet-wrap')) return closeSheet();
+    var t = e.target.closest('[data-compose],[data-edit],[data-cat],[data-aud],[data-person],[data-toggle],[data-more],[data-addphoto],[data-rmphoto],[data-submit],[data-archive]');
+    if (!t) return;
+    if (t.hasAttribute('data-compose')) return openCompose('');
+    if (t.hasAttribute('data-edit')) return openCompose(t.getAttribute('data-edit'));
+    var d = state.draft;
+    if (!d) return;
+    if (t.hasAttribute('data-addphoto')) return document.getElementById('photo-input').click();
+    if (t.hasAttribute('data-submit')) return submitPost();
+    if (t.hasAttribute('data-archive')) {
+      return sheet('<h2>Remove this post?</h2><p>It disappears from the app for everyone. The record stays in your Sheet.</p>' +
+        '<button class="btn btn-danger" data-sheet="archive">Remove post</button><button class="btn btn-ghost" data-sheet="close">Keep it</button>');
+    }
+    d.dirty = true;
+    if (t.hasAttribute('data-rmphoto')) { d.photo = null; if (d.hasPhoto) d.removePhoto = true; document.getElementById('photo-field').innerHTML = photoField(d); return; }
+    if (t.hasAttribute('data-cat')) d.categoryId = t.getAttribute('data-cat');
+    else if (t.hasAttribute('data-aud')) d.audience = t.getAttribute('data-aud');
+    else if (t.hasAttribute('data-person')) {
+      var id = t.getAttribute('data-person'), i = d.audienceIds.indexOf(id);
+      if (i === -1) d.audienceIds.push(id); else d.audienceIds.splice(i, 1);
+    }
+    else if (t.hasAttribute('data-toggle')) { var k = t.getAttribute('data-toggle'); d[k] = !d[k]; }
+    else if (t.hasAttribute('data-more')) { d.more = !d.more; d.dirty = d.dirty && true; }
+    saveDraft();
+    rerenderCompose();
+  }
+
+  /* A small sheet that slides up from the bottom for confirmations. */
+  function sheet(html) {
+    closeSheet();
+    toastEl.classList.remove('show');
+    var w = document.createElement('div');
+    w.className = 'sheet-wrap';
+    w.innerHTML = '<div class="sheet" role="dialog" aria-modal="true">' + html + '</div>';
+    document.body.appendChild(w);
+  }
+  function closeSheet() { var w = document.querySelector('.sheet-wrap'); if (w) w.remove(); }
+  function sheetAction(what) {
+    if (what === 'close') return closeSheet();
+    if (what === 'leave') { closeSheet(); return closeCompose(); }
+    if (what === 'post') return sendPost('');
+    if (what === 'small' || what === 'real') return sendPost(what);
+    if (what === 'archive') return archivePost();
+  }
+
+  function focusField(id) { var el = document.getElementById(id); if (el) { el.focus(); el.scrollIntoView({ block: 'center' }); } }
+
+  function submitPost() {
+    var d = state.draft;
+    if (!d.title.trim()) { toast('Add a title'); return focusField('f-title'); }
+    if (!d.body.trim()) { toast('Add the post text'); return focusField('f-body'); }
+    if (d.audience === 'people' && !d.audienceIds.length) return toast('Pick at least one person');
+    for (var i = 0; i < 2; i++) {
+      var l = d.links[i];
+      if (l.label.trim() && !l.url.trim()) { d.more = true; rerenderCompose(); return toast('Add the link for "' + l.label.trim() + '"'); }
+      if (l.url.trim() && !/^(https?:\/\/|sms:|tel:|mailto:)\S+$/i.test(l.url.trim())) { d.more = true; rerenderCompose(); return toast('Links need to start with https://'); }
+    }
+    var who = audienceWords(d);
+    if (!d.id) {
+      var lines = '<div class="sum"><span>Goes to</span><b>' + esc(who) + '</b></div>' +
+        '<div class="sum"><span>Mark as read</span><b>' + (d.needsRead ? (d.readBy ? 'Yes, by ' + fullDate(d.readBy) : 'Yes') : 'Not needed') + '</b></div>' +
+        (d.needsRead ? '<div class="sum"><span>Email</span><b>' + (d.skipEmail ? 'Skipped' : 'Starts once email is switched on') + '</b></div>' : '');
+      return sheet('<h2>Ready to post?</h2><p class="sheet-title">' + esc(d.title.trim()) + '</p>' + lines +
+        '<button class="btn btn-primary" data-sheet="post">Post now</button><button class="btn btn-ghost" data-sheet="close">Keep editing</button>');
+    }
+    var p = byId(d.id);
+    if (!d.needsRead || !(p && p.needsRead)) return sendPost('small');
+    sheet('<h2>Small fix or real change?</h2>' +
+      '<button class="choice" data-sheet="small"><b>Small fix</b><span>A typo or a tidy-up. Nobody is asked to read it again.</span></button>' +
+      '<button class="choice" data-sheet="real"><b>Real change</b><span>The meaning changed. Everyone reads it again and it gets an Updated tag.</span></button>' +
+      '<button class="btn btn-ghost" data-sheet="close">Keep editing</button>');
+  }
+
+  var sending = false;
+  function sendPost(change) {
+    if (sending) return;
+    var d = state.draft; if (!d) return;
+    sending = true;
+    var box = document.querySelector('.sheet');
+    if (box) box.innerHTML = '<div class="sheet-busy"><div class="sk" style="width:48px;height:48px;border-radius:50%"></div><p>' + (d.id ? 'Saving' : 'Posting') + (d.photo ? ' and sending the photo' : '') + '</p></div>';
+    api('savePost', {
+      change: change || '', removePhoto: !!d.removePhoto, photo: d.photo,
+      post: { id: d.id, title: d.title, body: d.body, categoryId: d.categoryId, pinned: d.pinned, needsRead: d.needsRead,
+        readBy: d.readBy, audience: d.audience, audienceIds: d.audienceIds, buttonText: d.buttonText,
+        links: d.links, eventDate: isPromo(d.categoryId) ? d.eventDate : '', skipEmail: d.skipEmail }
+    }).then(function (res) {
+      sending = false;
+      closeSheet();
+      if (!res || !res.ok) { toast((res && res.message) || 'That didn\'t save. Try again.'); return; }
+      state.posts = res.posts;
+      if (d.photo) state.photos[res.postId] = d.photo.data; else if (d.removePhoto) delete state.photos[res.postId];
+      if (!d.id) lsSet(DRAFT_KEY, '');
+      state.draft = null; state.flow = null;
+      saveLocalSnapshot();
+      state.view = 'post'; state.postId = res.postId;
+      replaceRoute('#/post/' + res.postId);
+      render('fade'); window.scrollTo(0, 0);
+      toast(res.isNew ? 'Posted' : res.real ? 'Saved. Everyone will be asked to read it again.' : 'Saved');
+    }).catch(function () {
+      sending = false; closeSheet();
+      toast('That didn\'t send. Check your connection and try again. Your post is still here.');
+    });
+  }
+
+  function archivePost() {
+    var d = state.draft; if (!d || !d.id || sending) return;
+    sending = true;
+    api('archivePost', { postId: d.id }).then(function (res) {
+      sending = false; closeSheet();
+      if (!res || !res.ok) return toast((res && res.message) || 'That didn\'t work. Try again.');
+      state.posts = res.posts; state.draft = null; saveLocalSnapshot();
+      goTab('bulletins', false);
+      toast('Post removed');
+    }).catch(function () { sending = false; closeSheet(); toast('That didn\'t work. Check your connection and try again.'); });
   }
 
   /* ---------- Events ---------- */
 
   document.addEventListener('click', function (e) {
     var t = e.target.closest('[data-tab],[data-open],[data-start],[data-back],[data-home],[data-filter],[data-clear],#markread');
-    if (!t) return;
+    if (!t) return composeClick(e);
     if (t.id === 'markread') return markRead();
     if (t.hasAttribute('data-tab')) return goTab(t.getAttribute('data-tab'));
     if (t.hasAttribute('data-open')) return openPost(t.getAttribute('data-open'));
     if (t.hasAttribute('data-start')) { var q = unreadQueue(); if (q[0]) openPost(q[0].id); return; }
-    if (t.hasAttribute('data-back')) { if (depth() > 0) history.back(); else goTab(state.tab, false); return; }
+    if (t.hasAttribute('data-back')) { if (state.view === 'compose') return leaveCompose(); if (depth() > 0) history.back(); else goTab(state.tab, false); return; }
     if (t.hasAttribute('data-home')) return goTab('home');
     if (t.hasAttribute('data-filter')) { state.filter = t.getAttribute('data-filter'); return refreshBulletins(); }
     if (t.hasAttribute('data-clear')) {
@@ -508,6 +871,7 @@
   });
 
   document.addEventListener('input', function (e) {
+    if (composeInput(e)) return;
     if (e.target.id !== 'search') return;
     state.search = e.target.value;
     var list = document.getElementById('list');
@@ -527,6 +891,8 @@
       state.view = 'post'; state.postId = m[1];
       if (!isUnread(byId(m[1]))) state.flow = null;
       else if (!state.flow) state.flow = { total: unreadQueue().length, done: 0, justRead: [] };
+    } else if (h === '#/compose' && state.draft && state.canPost) {
+      state.view = 'compose';
     } else {
       var tab = (/^#\/(home|bulletins|resources|contact|team)$/.exec(h) || [])[1] || 'home';
       if (tab === 'team' && state.me.role !== 'admin') tab = 'home';
