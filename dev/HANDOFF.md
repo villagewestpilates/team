@@ -5,7 +5,7 @@ Read this first, then the owner's original build prompt (they will paste it). No
 ## Where things stand
 - Stage 0 (setup, hello tests): done. Test A (HtmlService) fails in multi-account browsers. Test B (JSON service) works. We are building **version B**.
 - Stage 1 (personal links): done and confirmed by the owner on Mac and iPhone home screen.
-- Next: **Stage 2** (Home, Bulletins, reading a post). Owner has said OK to start it.
+- Stage 2 (Home, Bulletins, reading a post): built and published, waiting on the owner to try it and say OK. Next after that: **Stage 3** (posting).
 - Small carry-overs for stage 2: put the Beta tag beside the VILLAGE WEST wordmark (currently below it). Replace the stage 1 placeholder Home card.
 - Later: in stage 4, remind the owner to tap "New link" on their own row (their token appeared in a screenshot). At the very end, deactivate the "Test Person" row.
 
