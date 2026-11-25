@@ -475,3 +475,7 @@ body { background: var(--bg); }
 .textsize-label { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
 .textsize .seg-btn { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .textsize .seg-btn b { font-weight: 600; line-height: 1; }
+
+/* ---------- Settings tab ---------- */
+.textsize { margin-top: 0; padding-top: 0; border-top: 0; }
+.sub-title { margin-top: 40px; padding-top: 28px; border-top: 1px solid var(--line); font-size: 22px; }

@@ -252,7 +252,7 @@
 
   function textSizeControl() {
     var cur = SIZES[lsGet(SIZE_KEY)] ? lsGet(SIZE_KEY) : 'standard';
-    return '<div class="textsize"><div class="textsize-label">Text size on this phone</div><div class="seg-group">' +
+    return '<div class="textsize"><div class="seg-group">' +
       [['standard', 'Standard', 15], ['large', 'Large', 18], ['largest', 'Largest', 21]].map(function (x) {
         return '<button class="seg-btn' + (cur === x[0] ? ' on' : '') + '" data-size="' + x[0] + '" aria-pressed="' + (cur === x[0]) + '"><b style="font-size:' + x[2] + 'px">A</b>' + x[1] + '</button>';
       }).join('') + '</div></div>';
@@ -295,7 +295,7 @@
         read.slice(0, 5).map(function (p) { return compactRow(p, 'Read'); }).join('') + '</div>';
       if (read.length > 5) html += '<button class="link-btn" data-tab="bulletins">See all bulletins' + icon('chevron-right') + '</button>';
     }
-    return html + textSizeControl() + '</div>';
+    return html + '</div>';
   }
 
   /* ---------- Bulletins ---------- */
@@ -425,7 +425,7 @@
 
   /* ---------- Other tabs (later stages) ---------- */
 
-  var TAB_ICONS = { home: 'house', bulletins: 'newspaper', resources: 'layout-grid', contact: 'message-circle', team: 'users' };
+  var TAB_ICONS = { home: 'house', bulletins: 'newspaper', resources: 'layout-grid', contact: 'message-circle', team: 'settings' };
   function renderSoon() {
     var names = { resources: 'Resources', contact: 'Contact', team: 'Team' };
     return '<div class="center"><div class="bubble">' + icon(TAB_ICONS[state.tab]) + '</div>' +
@@ -447,7 +447,7 @@
     } else if (state.view === 'done') {
       html = renderDone();
     } else {
-      html = state.tab === 'home' ? renderHome() : state.tab === 'bulletins' ? renderBulletins() : state.tab === 'team' && state.me.role === 'admin' ? renderTeam() : state.tab === 'resources' ? renderResources() : state.tab === 'contact' ? renderContact() : renderSoon();
+      html = state.tab === 'home' ? renderHome() : state.tab === 'bulletins' ? renderBulletins() : state.tab === 'team' ? renderTeam() : state.tab === 'resources' ? renderResources() : state.tab === 'contact' ? renderContact() : renderSoon();
       if (state.canPost && (state.tab === 'home' || state.tab === 'bulletins')) {
         html += '<button class="fab" data-compose="new">' + icon('plus') + 'New post</button>';
       }
@@ -465,7 +465,7 @@
 
   function renderTabbar() {
     var tabs = [['home', 'Home'], ['bulletins', 'Bulletins'], ['resources', 'Resources'], ['contact', 'Contact']];
-    if (state.me.role === 'admin') tabs.push(['team', 'Team']);
+    tabs.push(['team', 'Settings']);
     var n = unreadQueue().length;
     tabbar.innerHTML = '<div class="tabbar-in">' + tabs.map(function (t) {
       var on = state.tab === t[0];
@@ -1122,9 +1122,23 @@
   function person(id) { return ((state.team && state.team.team) || []).filter(function (x) { return x.id === id; })[0]; }
   function linkFor(x) { return location.origin + location.pathname + '?k=' + x.token; }
 
+  function mySettings() {
+    var me = state.me;
+    return '<h2 class="section-label" style="margin-top:4px">Text size on this phone</h2>' + textSizeControl() +
+      '<p class="fine" style="margin-top:10px">Makes everything in the app bigger. It only changes this phone.</p>' +
+      '<h2 class="section-label">Keep the app handy</h2><div class="card"><p><b>iPhone:</b> open your link in Safari, tap the Share button, then "Add to Home Screen."</p>' +
+      '<p style="margin-top:10px"><b>Android:</b> open it in Chrome, tap the three dots, then "Add to Home screen."</p></div>' +
+      '<h2 class="section-label">You</h2><div class="card"><div class="rows" style="margin-top:0">' +
+        '<div class="row"><span class="muted">Signed in as</span><b>' + esc(me.name) + '</b></div>' +
+        '<div class="row"><span class="muted">Role</span><b>' + esc(ROLE_WORDS[me.role] || 'Team member') + (me.apprentice ? ', Apprentice' : '') + '</b></div></div></div>' +
+      '<button class="link-btn" data-tab="contact">' + icon('message-circle') + 'Something not working? Text the studio' + icon('chevron-right') + '</button>';
+  }
+
   function renderTeam() {
     var t = state.team;
-    var head = '<div class="screen"><h1 class="page-title">Team</h1>';
+    var head = '<div class="screen"><h1 class="page-title">Settings</h1>' + mySettings();
+    if (state.me.role !== 'admin') return head + '</div>';
+    head += '<h1 class="page-title sub-title">Team</h1>';
     if (!t) { loadTeam(); return head + '<div class="sk" style="height:56px;border-radius:16px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:26px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:10px"></div><div class="sk" style="height:64px;border-radius:18px;margin-top:10px"></div></div>'; }
     if (t.error) return head + '<div class="empty"><div class="bubble sm coral">' + icon('wifi-off') + '</div><div class="calm-title">' + esc(t.error) + '</div><button class="btn btn-outline sm" data-teamreload="1">Try again</button></div></div>';
     function row(x) {
@@ -1490,7 +1504,6 @@
       state.view = 'compose';
     } else {
       var tab = (/^#\/(home|bulletins|resources|contact|team)$/.exec(h) || [])[1] || 'home';
-      if (tab === 'team' && state.me.role !== 'admin') tab = 'home';
       state.view = 'tab'; state.tab = tab; state.flow = null;
     }
   }
