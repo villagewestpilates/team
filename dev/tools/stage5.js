@@ -16,7 +16,7 @@ const ALL = () => [
   ['Apprentices', 'apprentices', 'Co-Teaching Sign Up', 'https://docs.google.com/spreadsheets/d/6/edit'], ['Apprentices', 'apprentices', 'Apprentice Meetings recordings', 'https://drive.google.com/drive/folders/7'],
   ['Admins', 'admins', 'Intermediate Class Approval SOP', 'https://docs.google.com/document/d/8/edit']
 ].map((r, i) => ({ id: 'r' + i, section: r[0], audience: r[1], title: r[2], url: r[3] }));
-const CONTACTS = [{ name: 'The studio', label: 'Text the studio', phone: '+14435550100', primary: true }, { name: 'Barbara', label: 'Text Barbara', phone: '+14435550101' }, { name: 'Cory', label: 'Text Cory', phone: '+14435550102' }, { name: 'Alex', label: 'Text Alex', phone: '+12145550103' }];
+const CONTACTS = [{ name: 'The studio', label: 'Text the studio', phone: '+14435550100', primary: true }, { name: 'Bethany', label: 'Text Bethany', phone: '+14435550101' }, { name: 'Cole', label: 'Text Cole', phone: '+14435550102' }, { name: 'Adam', label: 'Text Adam', phone: '+12145550103' }];
 const visible = (all, role, apprentice) => all.filter(r => !r.archived && (role === 'admin' || (r.url && (r.audience === 'everyone' || (r.audience === 'apprentices' && apprentice)))));
 
 (async () => {
@@ -29,7 +29,7 @@ const visible = (all, role, apprentice) => all.filter(r => !r.archived && (role 
     page.on('pageerror', e => errors.push(String(e)));
     await page.route('**/script.google.com/**', async route => {
       const req = JSON.parse(route.request().postData() || '{}'); let out = { ok: true };
-      if (req.action === 'boot') out = { ok: true, me: { id: 'p0', name: 'Megan Hopkins', firstName: 'Megan', role, apprentice }, settings: { beta: true }, categories: [], posts: [], canPost: role !== 'member', people: [], resources: visible(all, role, apprentice), contacts: CONTACTS };
+      if (req.action === 'boot') out = { ok: true, me: { id: 'p0', name: 'Molly Hartman', firstName: 'Molly', role, apprentice }, settings: { beta: true }, categories: [], posts: [], canPost: role !== 'member', people: [], resources: visible(all, role, apprentice), contacts: CONTACTS };
       else if (req.action === 'saveResource') { sent.push(req.resource); const d = req.resource; if (d.id) Object.assign(all.find(r => r.id === d.id), { title: d.title, url: d.url, section: d.section, audience: d.audience, archived: d.archived }); else all.push({ id: 'r' + (n++), title: d.title, url: d.url, section: d.section, audience: d.audience }); out = { ok: true, resources: visible(all, role, apprentice) }; }
       route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(out) });
     });

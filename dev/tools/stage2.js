@@ -25,18 +25,18 @@ const CATS = [
 const LONG = Array.from({ length: 14 }, (_, i) => 'Paragraph ' + (i + 1) + '. When a client tells you about a new injury, a surgery, or anything else that changes how we teach them, text the studio the same day so every instructor sees it before their next class.').join('\n\n') + '\n\nFull policy: https://villagewestpilates.com/policies/client-health-updates-and-notes?ref=team-app';
 function post(o) {
   return Object.assign({ body: 'Body text.', categoryId: 'cat_announcements', pinned: false, needsRead: true, readBy: '', eventDate: '',
-    author: 'Barbara', mine: false, updated: false, buttonText: '', links: [], forMe: true, readAt: '' }, o);
+    author: 'Bethany', mine: false, updated: false, buttonText: '', links: [], forMe: true, readAt: '' }, o);
 }
 function fullSet() {
   return [
     post({ id: 'a', title: 'Text the studio with any client health updates', categoryId: 'cat_policies', readBy: '2026-11-27', createdAt: '2026-11-23T15:00:00Z',
       body: 'When a client tells you about a new injury, a surgery, or anything else that changes how we teach them, text the studio the same day.\n\nWe add it to their notes so every instructor sees it before their next class.',
       links: [{ label: 'Text the studio', url: 'sms:+14437025786' }] }),
-    post({ id: 'b', title: 'CPR/AED renewal with Resuscitech', categoryId: 'cat_schedule', author: 'Cory', createdAt: '2026-11-22T15:00:00Z', body: 'Group renewal is coming up. Details and what to bring are inside.' }),
+    post({ id: 'b', title: 'CPR/AED renewal with Resuscitech', categoryId: 'cat_schedule', author: 'Cole', createdAt: '2026-11-22T15:00:00Z', body: 'Group renewal is coming up. Details and what to bring are inside.' }),
     post({ id: 'c', title: 'Holiday open house and member appreciation weekend with extended retail hours and a very long title that keeps going to test wrapping', categoryId: 'cat_promos', eventDate: '2026-12-05', updated: true, pinned: true, createdAt: '2026-11-21T15:00:00Z', body: LONG, buttonText: 'I\'ve read the full policy' }),
-    post({ id: 'd', title: 'Welcome to the new Village West app (beta)', pinned: true, author: 'Alex', createdAt: '2026-11-20T15:00:00Z', readAt: '2026-11-20T18:00:00Z' }),
+    post({ id: 'd', title: 'Welcome to the new Village West app (beta)', pinned: true, author: 'Adam', createdAt: '2026-11-20T15:00:00Z', readAt: '2026-11-20T18:00:00Z' }),
     post({ id: 'e', title: 'Front desk coverage for Thanksgiving week', categoryId: 'cat_schedule', createdAt: '2026-11-18T15:00:00Z', readAt: '2026-11-19T18:00:00Z' }),
-    post({ id: 'f', title: 'New retail arrivals are on the shelf', categoryId: 'cat_promos', needsRead: false, author: 'Christine', createdAt: '2026-11-17T15:00:00Z' })
+    post({ id: 'f', title: 'New retail arrivals are on the shelf', categoryId: 'cat_promos', needsRead: false, author: 'Charlotte', createdAt: '2026-11-17T15:00:00Z' })
   ];
 }
 
@@ -59,7 +59,7 @@ const log = [];
       if (opts.delay) await new Promise(r => setTimeout(r, opts.delay));
       let out = { ok: false };
       if (req.k !== K) out = { ok: false, code: 'auth' };
-      else if (req.action === 'boot') out = { ok: true, me: { id: 'p1', name: 'Megan Hopkins', firstName: 'Megan', role: opts.role || 'member', apprentice: false }, settings: { beta: true }, categories: CATS, posts };
+      else if (req.action === 'boot') out = { ok: true, me: { id: 'p1', name: 'Molly Hartman', firstName: 'Molly', role: opts.role || 'member', apprentice: false }, settings: { beta: true }, categories: CATS, posts };
       else if (req.action === 'markRead') {
         if (opts.failMark) return route.abort();
         const p = posts.find(x => x.id === req.postId); p.readAt = new Date().toISOString(); out = { ok: true, readAt: p.readAt };
@@ -102,7 +102,7 @@ const log = [];
   check('third post', (await s.page.textContent('.progress-text')) === '3 of 3 to read');
   await shot(s.page, '03-post-last');
   await s.page.click('#markread'); await s.page.waitForSelector('.done'); await s.page.waitForTimeout(500);
-  check('caught up text', (await s.page.textContent('.done p')) === 'All 3 posts are marked as read. Thank you, Megan.', await s.page.textContent('.done p'));
+  check('caught up text', (await s.page.textContent('.done p')) === 'All 3 posts are marked as read. Thank you, Molly.', await s.page.textContent('.done p'));
   check('just read lists 3', (await s.page.$$('.rows-list .post-row')).length === 3);
   check('markRead sent 3 times', s.calls.filter(c => c === 'markRead').length === 3);
   await shot(s.page, '06-caught-up');

@@ -12,7 +12,7 @@ const log = []; const check = (n, ok, x) => log.push((ok ? 'PASS ' : 'FAIL ') + 
 (async () => {
   await new Promise(r => server.listen(8775, r));
   const browser = await chromium.launch(); const shots = [];
-  const cases = [['07:44', 'Good morning', 'tod-morning', 'Megan'], ['13:05', 'Good afternoon', 'tod-afternoon', 'Megan'], ['18:30', 'Good evening', 'tod-evening', 'Megan'], ['22:15', 'Good evening', 'tod-night', 'Christine-Alexandra']];
+  const cases = [['07:44', 'Good morning', 'tod-morning', 'Molly'], ['13:05', 'Good afternoon', 'tod-afternoon', 'Molly'], ['18:30', 'Good evening', 'tod-evening', 'Molly'], ['22:15', 'Good evening', 'tod-night', 'Charlotte-Alexandra']];
   for (const [time, word, cls, name] of cases) {
     const ctx = await browser.newContext({ viewport: { width: name.length > 8 ? 320 : 390, height: 844 }, deviceScaleFactor: 2, timezoneId: 'America/New_York' });
     const page = await ctx.newPage();

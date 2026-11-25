@@ -10,8 +10,8 @@ const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(res);
 });
 const CATS = [{ id: 'cat_announcements', name: 'Announcements', color: '#3F5FC0' }, { id: 'cat_policies', name: 'Policies', color: '#7B52B9' }, { id: 'cat_schedule', name: 'Schedule', color: '#4E8A6B' }, { id: 'cat_promos', name: 'Promotions & Events', color: '#B8892B' }];
-const PEOPLE = ['Alex Chambers', 'Barbara Burdette', 'Cory Perales', 'Christine Hannon', 'Debi Weir', 'Megan Hopkins', 'Ashton Weber', 'Lindsay Maher'].map((n, i) => ({ id: 'p' + i, name: n, firstName: n.split(' ')[0], apprentice: i === 1 || i > 5 }));
-const base0 = { body: 'Body text.', categoryId: 'cat_announcements', pinned: false, needsRead: true, readBy: '', eventDate: '', author: 'Barbara', mine: false, updated: false, buttonText: '', links: [], forMe: true, readAt: '', photo: null };
+const PEOPLE = ['Adam Caldwell', 'Bethany Bradshaw', 'Cole Preston', 'Charlotte Harper', 'Dana Wade', 'Molly Hartman', 'Aubrey Walsh', 'Lillian Marsh'].map((n, i) => ({ id: 'p' + i, name: n, firstName: n.split(' ')[0], apprentice: i === 1 || i > 5 }));
+const base0 = { body: 'Body text.', categoryId: 'cat_announcements', pinned: false, needsRead: true, readBy: '', eventDate: '', author: 'Bethany', mine: false, updated: false, buttonText: '', links: [], forMe: true, readAt: '', photo: null };
 const log = [];
 const check = (name, ok, extra) => log.push((ok ? 'PASS ' : 'FAIL ') + name + (extra ? '  [' + extra + ']' : ''));
 
@@ -25,10 +25,10 @@ const check = (name, ok, extra) => log.push((ok ? 'PASS ' : 'FAIL ') + name + (e
     const canPost = role !== 'member';
     await page.route('**/script.google.com/**', async route => {
       const req = JSON.parse(route.request().postData() || '{}'); let out = { ok: false };
-      if (req.action === 'boot') out = { ok: true, me: { id: 'p0', name: 'Alex Chambers', firstName: 'Alex', role, apprentice: false }, settings: { beta: true }, categories: CATS, posts, canPost, people: canPost ? PEOPLE : [], defaultCategory: 'cat_announcements', serverTime: new Date().toISOString() };
+      if (req.action === 'boot') out = { ok: true, me: { id: 'p0', name: 'Adam Caldwell', firstName: 'Adam', role, apprentice: false }, settings: { beta: true }, categories: CATS, posts, canPost, people: canPost ? PEOPLE : [], defaultCategory: 'cat_announcements', serverTime: new Date().toISOString() };
       else if (req.action === 'savePost') {
         sent.push(req); const d = req.post; const isNew = !d.id; const id = d.id || 'new1';
-        const post = Object.assign({}, base0, { id, title: d.title.trim(), body: d.body.trim(), categoryId: d.categoryId, pinned: d.pinned, needsRead: d.needsRead, readBy: d.readBy, eventDate: d.eventDate, author: 'Alex', mine: true, createdAt: new Date().toISOString(), readAt: new Date().toISOString(), buttonText: d.buttonText, links: d.links.filter(l => l.url), photo: req.photo ? { w: req.photo.w, h: req.photo.h } : null, canEdit: true, stats: { read: 1, total: 8 }, audience: d.audience, audienceIds: d.audienceIds, skipEmail: d.skipEmail, updated: req.change === 'real' });
+        const post = Object.assign({}, base0, { id, title: d.title.trim(), body: d.body.trim(), categoryId: d.categoryId, pinned: d.pinned, needsRead: d.needsRead, readBy: d.readBy, eventDate: d.eventDate, author: 'Adam', mine: true, createdAt: new Date().toISOString(), readAt: new Date().toISOString(), buttonText: d.buttonText, links: d.links.filter(l => l.url), photo: req.photo ? { w: req.photo.w, h: req.photo.h } : null, canEdit: true, stats: { read: 1, total: 8 }, audience: d.audience, audienceIds: d.audienceIds, skipEmail: d.skipEmail, updated: req.change === 'real' });
         const i = posts.findIndex(x => x.id === id); if (i === -1) posts.unshift(post); else posts[i] = post;
         if (req.photo) posts.photoData = req.photo.data;
         out = { ok: true, postId: id, isNew, real: req.change === 'real', posts };
@@ -41,7 +41,7 @@ const check = (name, ok, extra) => log.push((ok ? 'PASS ' : 'FAIL ') + name + (e
   }
   const shot = (page, name) => page.screenshot({ path: path.join(OUT, name + '.png') });
   const toastText = page => page.textContent('#toast');
-  const existing = () => [Object.assign({}, base0, { id: 'a', title: 'Front desk coverage for Thanksgiving week', categoryId: 'cat_schedule', createdAt: '2026-11-20T15:00:00Z', readAt: '2026-11-20T18:00:00Z', mine: true, author: 'Alex', canEdit: true, stats: { read: 6, total: 13 }, audience: 'everyone', audienceIds: [], skipEmail: false, readBy: '2026-11-27' })];
+  const existing = () => [Object.assign({}, base0, { id: 'a', title: 'Front desk coverage for Thanksgiving week', categoryId: 'cat_schedule', createdAt: '2026-11-20T15:00:00Z', readAt: '2026-11-20T18:00:00Z', mine: true, author: 'Adam', canEdit: true, stats: { read: 6, total: 13 }, audience: 'everyone', audienceIds: [], skipEmail: false, readBy: '2026-11-27' })];
 
   // Team member: no way to post.
   let s = await session('member', existing().map(p => Object.assign(p, { canEdit: false, stats: undefined })));
@@ -91,7 +91,7 @@ const check = (name, ok, extra) => log.push((ok ? 'PASS ' : 'FAIL ') + name + (e
   await s.page.screenshot({ path: path.join(OUT, '04-compose-more-full.png'), fullPage: true });
   await s.page.click('[data-submit]'); await s.page.waitForSelector('.sheet'); await s.page.waitForTimeout(250);
   const sheetText = await s.page.textContent('.sheet');
-  check('review sheet names the audience and date', sheetText.includes('Barbara, Megan') && sheetText.includes('Yes, by Fri, Nov 27'), sheetText.slice(0, 160));
+  check('review sheet names the audience and date', sheetText.includes('Bethany, Molly') && sheetText.includes('Yes, by Fri, Nov 27'), sheetText.slice(0, 160));
   await shot(s.page, '05-review-sheet');
   check('nothing sent before Post now', s.sent.length === 0);
   await s.page.click('[data-sheet="post"]'); await s.page.waitForSelector('.post-title'); await s.page.waitForSelector('.photo img'); await s.page.waitForTimeout(400);

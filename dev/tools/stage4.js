@@ -12,12 +12,12 @@ const log = []; const check = (n, ok, x) => log.push((ok ? 'PASS ' : 'FAIL ') + 
 const THUMB = 'data:image/jpeg;base64,' + fs.readFileSync(path.join(ROOT, 'icons', 'icon-180.png')).toString('base64'); // any small image works for layout
 function world() {
   const tok = i => ('tok' + i).padEnd(32, 'x');
-  const team = ['Alex Chambers|admin|0', 'Barbara Burdette|admin|1', 'Christine Hannon|poster|0', 'Megan Hopkins|member|0', 'Ashton Weber|member|1'].map((s, i) => { const [name, role, a] = s.split('|'); return { id: 'p' + i, name, firstName: name.split(' ')[0], email: name.split(' ')[0].toLowerCase() + '@example.com', role, apprentice: a === '1', deactivated: false, token: tok(i), lastVisit: i < 3 ? '2026-11-2' + (2 + i) + 'T15:00:00Z' : '', linkSentAt: '' }; });
+  const team = ['Adam Caldwell|admin|0', 'Bethany Bradshaw|admin|1', 'Charlotte Harper|poster|0', 'Molly Hartman|member|0', 'Aubrey Walsh|member|1'].map((s, i) => { const [name, role, a] = s.split('|'); return { id: 'p' + i, name, firstName: name.split(' ')[0], email: name.split(' ')[0].toLowerCase() + '@example.com', role, apprentice: a === '1', deactivated: false, token: tok(i), lastVisit: i < 3 ? '2026-11-2' + (2 + i) + 'T15:00:00Z' : '', linkSentAt: '' }; });
   const categories = [{ id: 'cat_announcements', name: 'Announcements', color: '#3F5FC0', archived: false }, { id: 'cat_policies', name: 'Policies', color: '#7B52B9', archived: false }, { id: 'cat_old', name: 'Old one', color: '#5A6470', archived: true }];
   const base = { categoryId: 'cat_announcements', pinned: false, needsRead: true, readBy: '', eventDate: '', updated: false, buttonText: '', links: [], forMe: true, photo: null };
   const posts = [
-    Object.assign({}, base, { id: 'a', title: 'Studio closed Thursday for Thanksgiving', body: '**Bring:**\n- Your mat\n- Water\n\nSee you Friday.', author: 'Barbara', mine: false, createdAt: '2026-11-23T15:00:00Z', readAt: '', thumb: THUMB, photo: { w: 4, h: 3 }, canEdit: true, stats: { read: 2, total: 5 }, audience: 'everyone', audienceIds: [], skipEmail: false, authorId: 'p1' }),
-    Object.assign({}, base, { id: 'b', title: 'Retail shelf reset', body: 'Done.', author: 'Christine', mine: false, categoryId: 'cat_old', createdAt: '2026-11-20T15:00:00Z', readAt: '2026-11-21T15:00:00Z', canEdit: true, stats: { read: 5, total: 5 }, audience: 'everyone', audienceIds: [], skipEmail: false, authorId: 'p2' })
+    Object.assign({}, base, { id: 'a', title: 'Studio closed Thursday for Thanksgiving', body: '**Bring:**\n- Your mat\n- Water\n\nSee you Friday.', author: 'Bethany', mine: false, createdAt: '2026-11-23T15:00:00Z', readAt: '', thumb: THUMB, photo: { w: 4, h: 3 }, canEdit: true, stats: { read: 2, total: 5 }, audience: 'everyone', audienceIds: [], skipEmail: false, authorId: 'p1' }),
+    Object.assign({}, base, { id: 'b', title: 'Retail shelf reset', body: 'Done.', author: 'Charlotte', mine: false, categoryId: 'cat_old', createdAt: '2026-11-20T15:00:00Z', readAt: '2026-11-21T15:00:00Z', canEdit: true, stats: { read: 5, total: 5 }, audience: 'everyone', audienceIds: [], skipEmail: false, authorId: 'p2' })
   ];
   return { team, categories, posts, beta: true, n: 10 };
 }
@@ -34,7 +34,7 @@ function world() {
       const me = w.team.find(t => t.token === req.k);
       if (!me || me.deactivated) out = { ok: false, code: 'auth' };
       else if (req.action === 'boot') out = { ok: true, me: { id: me.id, name: me.name, firstName: me.firstName, role: me.role, apprentice: me.apprentice }, settings: { beta: w.beta }, categories: w.categories, posts: me.role === 'member' ? w.posts.map(p => Object.assign({}, p, { canEdit: false, stats: undefined })) : me.role === 'poster' ? w.posts.map(p => p.authorId === me.id ? p : Object.assign({}, p, { canEdit: false, stats: undefined })) : w.posts, canPost: me.role !== 'member', people: me.role === 'member' ? [] : w.team.filter(t => !t.deactivated).map(t => ({ id: t.id, name: t.name, firstName: t.firstName, apprentice: t.apprentice, role: t.role })), defaultCategory: 'cat_announcements', serverTime: new Date().toISOString() };
-      else if (req.action === 'readers') out = { ok: true, postId: req.postId, emailOn: false, groups: { read: [{ id: 'p1', name: 'Barbara Burdette', at: '2026-11-23T16:00:00Z', lastVisit: '2026-11-23T16:00:00Z' }, { id: 'p0', name: 'Alex Chambers', at: '2026-11-23T15:30:00Z', lastVisit: '2026-11-24T15:00:00Z' }], opened: [{ id: 'p2', name: 'Christine Hannon', at: '2026-11-24T14:00:00Z', lastVisit: '2026-11-24T14:00:00Z' }], notOpened: [{ id: 'p3', name: 'Megan Hopkins', lastVisit: '2026-11-22T14:00:00Z' }, { id: 'p4', name: 'Ashton Weber', lastVisit: '' }] } };
+      else if (req.action === 'readers') out = { ok: true, postId: req.postId, emailOn: false, groups: { read: [{ id: 'p1', name: 'Bethany Bradshaw', at: '2026-11-23T16:00:00Z', lastVisit: '2026-11-23T16:00:00Z' }, { id: 'p0', name: 'Adam Caldwell', at: '2026-11-23T15:30:00Z', lastVisit: '2026-11-24T15:00:00Z' }], opened: [{ id: 'p2', name: 'Charlotte Harper', at: '2026-11-24T14:00:00Z', lastVisit: '2026-11-24T14:00:00Z' }], notOpened: [{ id: 'p3', name: 'Molly Hartman', lastVisit: '2026-11-22T14:00:00Z' }, { id: 'p4', name: 'Aubrey Walsh', lastVisit: '' }] } };
       else if (req.action === 'nudge' || req.action === 'emailLink') out = { ok: false, code: 'email_off', message: 'Email isn\'t switched on yet. It comes in the last stage.' };
       else if (req.action === 'team') out = me.role === 'admin' ? teamReply() : { ok: false, code: 'forbidden', message: 'Only admins can do that.' };
       else if (req.action === 'savePerson') { const d = req.person; if (d.id) { Object.assign(w.team.find(t => t.id === d.id), { name: d.name, firstName: d.name.split(' ')[0], email: d.email, role: d.role, apprentice: d.apprentice }); out = teamReply({ personId: d.id }); } else { const id = 'p' + (w.n++); w.team.push({ id, name: d.name, firstName: d.name.split(' ')[0], email: d.email, role: d.role, apprentice: d.apprentice, deactivated: false, token: ('new' + id).padEnd(32, 'z'), lastVisit: '', linkSentAt: '' }); out = teamReply({ personId: id, added: true }); } }
@@ -84,9 +84,9 @@ function world() {
   await pg.click('[data-fmt="bold"]'); check('Bold button wraps the selection', (await pg.inputValue('#f-body')) === '- **Mat**\n- Water');
   await pg.click('[data-more]'); await pg.waitForSelector('[data-author]');
   const authors = await pg.$$eval('[data-author]', e => e.map(x => x.textContent));
-  check('Post as lists admins and posters only', authors.join(',') === 'Me,Barbara,Christine', authors.join(','));
+  check('Post as lists admins and posters only', authors.join(',') === 'Me,Bethany,Charlotte', authors.join(','));
   check('archived category not offered', !(await pg.textContent('.compose')).includes('Old one'));
-  await pg.click('[data-author="p1"]'); await pg.fill('#f-title', 'From Barbara');
+  await pg.click('[data-author="p1"]'); await pg.fill('#f-title', 'From Bethany');
   await pg.click('[data-submit]'); await pg.waitForSelector('.sheet'); await pg.click('[data-sheet="post"]'); await pg.waitForTimeout(500);
   const sp = s.sent.find(r => r.action === 'savePost');
   check('Post as is sent', sp && sp.post.authorId === 'p1');
@@ -103,7 +103,7 @@ function world() {
   const clip = await pg.evaluate(() => navigator.clipboard.readText());
   check('Copy link puts the full link on the clipboard', clip === base + '?k=' + w.team[3].token, clip.slice(0, 60));
   await pg.click('[data-sheet="emaillink"]'); await pg.waitForTimeout(300); check('Email it says email is off for now', (await toast(pg)).startsWith('Email isn\'t switched on yet'));
-  await pg.click('[data-sheet="asknewlink"]'); await pg.waitForTimeout(200); check('New link asks first', (await pg.textContent('.sheet h2')) === 'Give Megan a new link?');
+  await pg.click('[data-sheet="asknewlink"]'); await pg.waitForTimeout(200); check('New link asks first', (await pg.textContent('.sheet h2')) === 'Give Molly a new link?');
   await shot(pg, '06-new-link-confirm');
   await pg.click('[data-sheet="newlink"]'); await pg.waitForSelector('.note'); const link1 = await pg.textContent('.linkbox');
   check('New link changes the link', link0 !== link1 && link1.includes('rot'));

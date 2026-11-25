@@ -10,10 +10,10 @@ const server = http.createServer((req, res) => {
 });
 const log = []; const check = (n, ok, x) => log.push((ok ? 'PASS ' : 'FAIL ') + n + (x ? '  [' + x + ']' : ''));
 const b0 = { categoryId: 'c', pinned: false, needsRead: true, readBy: '', eventDate: '', updated: false, buttonText: '', links: [], forMe: true, photo: null };
-const world = role => ({ ok: true, me: { id: 'p0', name: 'Alex Chambers', firstName: 'Alex', role }, settings: { beta: true }, categories: [{ id: 'c', name: 'Announcements', color: '#3F5FC0' }],
-  posts: role === 'member' ? [Object.assign({}, b0, { id: 'a', title: 'Studio closed Thursday', body: 'Body', author: 'Barbara', mine: false, createdAt: '2026-11-23T15:00:00Z', readAt: '2026-11-23T16:00:00Z' })] : [
-    Object.assign({}, b0, { id: 'a', title: 'Studio closed Thursday', body: 'Body', author: 'Barbara', mine: false, createdAt: '2026-11-23T15:00:00Z', readAt: '2026-11-23T16:00:00Z', canEdit: true, stats: { read: 2, total: 5 }, audience: 'everyone', audienceIds: [], authorId: 'p1', status: '' }),
-    Object.assign({}, b0, { id: 'd', title: 'Half-written draft', body: '', author: 'Alex', mine: true, createdAt: '2026-11-24T15:00:00Z', readAt: '', canEdit: true, stats: { read: 0, total: 5 }, audience: 'everyone', audienceIds: [], authorId: 'p0', status: 'draft', savedAt: '2026-11-24T15:00:00Z' })],
+const world = role => ({ ok: true, me: { id: 'p0', name: 'Adam Caldwell', firstName: 'Adam', role }, settings: { beta: true }, categories: [{ id: 'c', name: 'Announcements', color: '#3F5FC0' }],
+  posts: role === 'member' ? [Object.assign({}, b0, { id: 'a', title: 'Studio closed Thursday', body: 'Body', author: 'Bethany', mine: false, createdAt: '2026-11-23T15:00:00Z', readAt: '2026-11-23T16:00:00Z' })] : [
+    Object.assign({}, b0, { id: 'a', title: 'Studio closed Thursday', body: 'Body', author: 'Bethany', mine: false, createdAt: '2026-11-23T15:00:00Z', readAt: '2026-11-23T16:00:00Z', canEdit: true, stats: { read: 2, total: 5 }, audience: 'everyone', audienceIds: [], authorId: 'p1', status: '' }),
+    Object.assign({}, b0, { id: 'd', title: 'Half-written draft', body: '', author: 'Adam', mine: true, createdAt: '2026-11-24T15:00:00Z', readAt: '', canEdit: true, stats: { read: 0, total: 5 }, audience: 'everyone', audienceIds: [], authorId: 'p0', status: 'draft', savedAt: '2026-11-24T15:00:00Z' })],
   canPost: role !== 'member', people: [], defaultCategory: 'c',
   resources: [{ id: 'r1', title: 'Employee Handbook', url: 'https://drive.google.com/file/d/1/view', section: 'Documents', audience: 'everyone' }, { id: 'r3', title: 'Class Approval SOP', url: 'https://docs.google.com/document/d/3/edit', section: 'Admins', audience: 'admins' }].concat(role === 'admin' ? [{ id: 'r2', title: 'Incident Report Form', url: '', section: 'Documents', audience: 'everyone' }] : []).filter(r => role === 'admin' || r.audience === 'everyone'),
   contacts: [] });

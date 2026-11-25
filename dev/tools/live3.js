@@ -12,13 +12,13 @@ const API = 'https://script.google.com/macros/s/' + fs.readFileSync(path.join(__
   const call = (body) => p.evaluate(async ([u, bd]) => (await fetch(u, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(bd) })).json(), [API, Object.assign({ k: K }, body)]);
   await p.goto('https://team.villagewestpilates.com/?k=' + K); await p.waitForSelector('.fab', { timeout: 60000 });
 
-  // 1. The test post for Alex, with a photo.
+  // 1. The test post for Adam, with a photo.
   await p.click('.fab'); await p.waitForSelector('#f-title');
   await p.fill('#f-title', 'Test post: try Mark as read');
-  await p.fill('#f-body', 'This one is just for you, Alex, so you can try the whole flow on your phone.\n\n1. Tap the photo to see it full size.\n2. Scroll down and tap "Mark as read."\n3. You should land on "You\'re all caught up."\n\nYou can remove this post afterward: open it, tap the pencil, then More options, then "Remove this post."');
+  await p.fill('#f-body', 'This one is just for you, Adam, so you can try the whole flow on your phone.\n\n1. Tap the photo to see it full size.\n2. Scroll down and tap "Mark as read."\n3. You should land on "You\'re all caught up."\n\nYou can remove this post afterward: open it, tap the pencil, then More options, then "Remove this post."');
   await p.setInputFiles('#photo-input', big); await p.waitForSelector('.photo-pick.has img', { timeout: 30000 });
   await p.click('[data-aud="people"]'); await p.waitForSelector('.people');
-  await p.click('.person:has-text("Alex Chambers")');
+  await p.click('.person:has-text("Adam Caldwell")');
   await p.click('[data-more]'); await p.click('[data-toggle="skipEmail"]');
   await p.click('[data-submit]'); await p.waitForSelector('.sheet'); console.log('review:', (await p.textContent('.sheet')).replace(/\s+/g, ' ').slice(0, 150));
   const t0 = Date.now(); await p.click('[data-sheet="post"]'); await p.waitForSelector('.post-title', { timeout: 90000 });

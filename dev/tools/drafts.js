@@ -16,15 +16,15 @@ const base0 = { categoryId: 'c', pinned: false, needsRead: true, readBy: '', eve
   const ctx = await browser.newContext(Object.assign({}, devices['iPhone 13'])); await ctx.addInitScript(() => { try { localStorage.setItem('vwp.edit', '1'); } catch (e) {} });
   const page = await ctx.newPage(); const errors = []; const sent = []; page.on('pageerror', e => errors.push(String(e)));
   const cdp = await ctx.newCDPSession(page);
-  const posts = [Object.assign({}, base0, { id: 'a', title: 'Skim me', body: 'Line\n'.repeat(60), author: 'Barbara', mine: false, createdAt: '2026-11-23T15:00:00Z', readAt: '' })];
+  const posts = [Object.assign({}, base0, { id: 'a', title: 'Skim me', body: 'Line\n'.repeat(60), author: 'Bethany', mine: false, createdAt: '2026-11-23T15:00:00Z', readAt: '' })];
   let n = 1;
   await page.route('**/script.google.com/**', async route => {
     const req = JSON.parse(route.request().postData() || '{}'); let out = { ok: true };
-    if (req.action === 'boot') out = { ok: true, me: { id: 'p0', name: 'Alex Chambers', firstName: 'Alex', role: 'admin', apprentice: false }, settings: { beta: true }, categories: [{ id: 'c', name: 'Announcements', color: '#3F5FC0' }], posts, canPost: true, people: [{ id: 'p0', name: 'Alex Chambers', firstName: 'Alex', role: 'admin' }, { id: 'p1', name: 'Megan Hopkins', firstName: 'Megan', role: 'member' }], defaultCategory: 'c', resources: [], contacts: [] };
+    if (req.action === 'boot') out = { ok: true, me: { id: 'p0', name: 'Adam Caldwell', firstName: 'Adam', role: 'admin', apprentice: false }, settings: { beta: true }, categories: [{ id: 'c', name: 'Announcements', color: '#3F5FC0' }], posts, canPost: true, people: [{ id: 'p0', name: 'Adam Caldwell', firstName: 'Adam', role: 'admin' }, { id: 'p1', name: 'Molly Hartman', firstName: 'Molly', role: 'member' }], defaultCategory: 'c', resources: [], contacts: [] };
     else if (req.action === 'savePost') {
       sent.push(req); const d = req.post; const id = d.id || 'n' + (n++);
       const status = d.status === 'draft' ? 'draft' : d.publishAt ? 'scheduled' : '';
-      const post = Object.assign({}, base0, { id, title: d.title.trim(), body: d.body, author: 'Alex', mine: true, createdAt: new Date().toISOString(), readAt: status === 'draft' ? '' : new Date().toISOString(), canEdit: true, stats: { read: 1, total: 2 }, audience: d.audience, audienceIds: d.audienceIds, authorId: 'p0', status, publishAt: d.publishAt || '', savedAt: new Date().toISOString() });
+      const post = Object.assign({}, base0, { id, title: d.title.trim(), body: d.body, author: 'Adam', mine: true, createdAt: new Date().toISOString(), readAt: status === 'draft' ? '' : new Date().toISOString(), canEdit: true, stats: { read: 1, total: 2 }, audience: d.audience, audienceIds: d.audienceIds, authorId: 'p0', status, publishAt: d.publishAt || '', savedAt: new Date().toISOString() });
       const i = posts.findIndex(x => x.id === id); if (i === -1) posts.unshift(post); else posts[i] = post;
       out = { ok: true, postId: id, isNew: !d.id, real: false, status, posts };
     }
