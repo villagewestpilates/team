@@ -49,3 +49,9 @@ Bump the number in `version.json` on every publish. index.html reads it uncached
 - Scheduled posts: the email goes out the next time anyone opens the app after the time has passed (sendDue_ in boot). A time trigger would make it exact but needs one more permission; the owner has not decided.
 - `dev/tools/server_test_email.js` checks all of this against a pretend mail service.
 - Still to do: the three written guides from the FINISH section of the original prompt, then deactivate the Test Person row when the owner is done testing.
+
+## Design changes made at the owner's request (these replace parts of the original prompt)
+- Soft gray page with white cards. Official VILLAGE WEST wordmark image, top and center on Home, with a time-of-day icon and a day and time stamp.
+- Fifth tab is Settings for everyone (text size, home screen tips). Admins also see Team tools there.
+- Edit mode (localStorage vwp.edit): off by default. Editing tools (New post, pencils, drafts, read counts, resource tools) only show when it is on. Browser tests switch it on first. The older live test scripts that click the New post button need it switched on too.
+- The owner is not ready for the written guides or the team text. Next step is a UX audit: Claude lists issues ranked, the owner picks.

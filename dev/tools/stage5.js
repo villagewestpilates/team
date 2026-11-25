@@ -24,7 +24,7 @@ const visible = (all, role, apprentice) => all.filter(r => !r.archived && (role 
   const browser = await chromium.launch(); const base = 'http://localhost:8772/';
   async function session(role, apprentice) {
     const all = ALL(); let n = 50;
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 }); await ctx.addInitScript(() => { try { localStorage.setItem('vwp.edit', '1'); } catch (e) {} });
     const page = await ctx.newPage(); const errors = []; const sent = [];
     page.on('pageerror', e => errors.push(String(e)));
     await page.route('**/script.google.com/**', async route => {
@@ -93,7 +93,7 @@ const visible = (all, role, apprentice) => all.filter(r => !r.archived && (role 
   await s.ctx.close();
 
   // The public "link didn't work" screen uses the studio line, not a personal number.
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } }); const p0 = await ctx.newPage();
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } }); await ctx.addInitScript(() => { try { localStorage.setItem('vwp.edit', '1'); } catch (e) {} }); const p0 = await ctx.newPage();
   await p0.goto(base); await p0.waitForSelector('.center h1');
   check('link problem screen offers Text the studio', (await p0.textContent('.center .btn')).trim() === 'Text the studio');
   const src = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');

@@ -48,7 +48,7 @@ const log = [];
   const check = (name, ok, extra) => { log.push((ok ? 'PASS ' : 'FAIL ') + name + (extra ? '  [' + extra + ']' : '')); };
 
   async function session(posts, opts = {}) {
-    const ctx = await browser.newContext({ viewport: { width: opts.width || 390, height: 844 }, deviceScaleFactor: 2 });
+    const ctx = await browser.newContext({ viewport: { width: opts.width || 390, height: 844 }, deviceScaleFactor: 2 }); await ctx.addInitScript(() => { try { localStorage.setItem('vwp.edit', '1'); } catch (e) {} });
     const page = await ctx.newPage();
     const errors = []; const calls = [];
     page.on('pageerror', e => errors.push(String(e)));
