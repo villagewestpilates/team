@@ -433,6 +433,7 @@
 
   function showDone() {
     state.view = 'done'; state.tab = 'home';
+    toastEl.classList.remove('show'); // this screen already says it
     replaceRoute('#/home');
     render('fade');
     window.scrollTo(0, 0);
