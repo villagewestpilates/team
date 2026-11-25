@@ -212,8 +212,8 @@
   function header() {
     var me = state.me, t = timeOfDay();
     return '<header class="top">' +
-      '<div class="top-brand"><img class="wordmark-img" src="brand/wordmark.png" alt="Village West" width="156" height="13">' +
-      (state.settings.beta ? '<span class="beta">Beta</span>' : '') + '</div>' +
+      '<div class="top-brand">' + (state.settings.beta ? '<span class="beta">Beta</span>' : '') +
+      '<img class="wordmark-img" src="brand/wordmark.png" alt="Village West" width="156" height="13"></div>' +
       '<div class="hello"><span class="tod ' + t.cls + '" aria-hidden="true">' + icon(t.icon) + '</span>' +
       '<div class="hello-text"><div class="hello-small">' + t.word + '</div>' +
       '<div class="hello-name">' + esc(me.firstName) + '</div></div>' +
@@ -448,6 +448,32 @@
     '</div>';
   }
 
+  /* ---------- A little celebration for getting caught up ---------- */
+
+  var PARTY = ['#465A50', '#163D38', '#E58B7C', '#B8892B', '#7B52B9', '#3F5FC0', '#A9C4B6'];
+  function celebrate() {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var from = app.querySelector('.done .bubble');
+    if (!from) return;
+    var r = from.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    var box = document.createElement('div');
+    box.className = 'party'; box.setAttribute('aria-hidden', 'true');
+    var html = '';
+    for (var i = 0; i < 46; i++) {
+      var ang = (Math.PI * 2 * i) / 46 + (Math.random() - 0.5) * 0.5;
+      var dist = 90 + Math.random() * 150;
+      var dx = Math.cos(ang) * dist, dy = Math.sin(ang) * dist - 60;      // a burst that leans upward
+      var shape = i % 3;                                                  // dot, strip, or ring
+      var size = 6 + Math.random() * 7;
+      html += '<i class="bit s' + shape + '" style="left:' + cx + 'px;top:' + cy + 'px;width:' + (shape === 1 ? size * 0.55 : size) + 'px;height:' + (shape === 1 ? size * 1.7 : size) + 'px;' +
+        (shape === 2 ? 'border-color:' : 'background:') + PARTY[i % PARTY.length] + ';--dx:' + dx.toFixed(0) + 'px;--dy:' + dy.toFixed(0) + 'px;--fall:' + (120 + Math.random() * 140).toFixed(0) + 'px;--rot:' + (Math.random() * 720 - 360).toFixed(0) + 'deg;animation-delay:' + (Math.random() * 90).toFixed(0) + 'ms;animation-duration:' + (1300 + Math.random() * 700).toFixed(0) + 'ms"></i>';
+    }
+    box.innerHTML = html;
+    document.body.appendChild(box);
+    from.classList.add('pop');
+    setTimeout(function () { box.remove(); }, 2400);
+  }
+
   /* ---------- Other tabs (later stages) ---------- */
 
   var TAB_ICONS = { home: 'house', bulletins: 'newspaper', resources: 'layout-grid', contact: 'message-circle', team: 'settings' };
@@ -540,6 +566,7 @@
   function showDone() {
     state.view = 'done'; state.tab = 'home';
     toastEl.classList.remove('show'); // this screen already says it
+    setTimeout(celebrate, 120);
     replaceRoute('#/home');
     render('fade');
     window.scrollTo(0, 0);
