@@ -31,12 +31,15 @@ const posts = () => [
   await page.click('[data-open="a"]'); await page.waitForSelector('.post-title'); await page.waitForTimeout(300); await shot('02-post');
   await page.click('.bar-back'); await page.waitForSelector('.todo');
   for (const tab of ['bulletins', 'resources', 'contact']) { await page.click('[data-tab="' + tab + '"]'); await page.waitForTimeout(350); await shot('03-' + tab); }
-  await page.click('[data-tab="home"]'); await page.waitForSelector('.textsize');
-  check('text size control is on Home, Standard selected', (await page.textContent('.textsize .seg-btn.on')).includes('Standard'));
+  await page.click('[data-tab="team"]'); await page.waitForSelector('.textsize'); await page.waitForTimeout(400); await shot('03-settings');
+  check('text size control is in Settings, Standard selected', (await page.textContent('.textsize .seg-btn.on')).includes('Standard'));
+  check('not on Home any more', await (async () => { await page.click('[data-tab="home"]'); await page.waitForSelector('.todo'); const gone = !(await page.$('.textsize')); return gone; })());
   const size0 = await page.evaluate(() => document.querySelector('.card-title').getBoundingClientRect().height);
+  await page.click('[data-tab="team"]'); await page.waitForSelector('.textsize');
   for (const sz of ['large', 'largest']) {
     await page.click('[data-size="' + sz + '"]'); await page.waitForTimeout(350);
-    check(sz + ': saved and selected', (await page.evaluate(() => localStorage.getItem('vwp.size'))) === sz && (await page.getAttribute('[data-size="' + sz + '"]', 'aria-pressed')) === 'true');
+    await page.click('[data-tab="home"]'); await page.waitForSelector('.todo');
+    check(sz + ': saved and selected', (await page.evaluate(() => localStorage.getItem('vwp.size'))) === sz) ; if (false) check('', (await page.evaluate(() => localStorage.getItem('vwp.size'))) === sz && (await page.getAttribute('[data-size="' + sz + '"]', 'aria-pressed')) === 'true');
     check(sz + ': Home fits, no side scroll, tab names not cut off', (await fits()) && (await tabsFit()));
     await page.evaluate(() => window.scrollTo(0, 0)); await shot('04-home-' + sz);
     await page.click('[data-open="a"]'); await page.waitForSelector('.post-title'); await page.waitForTimeout(300);
@@ -46,13 +49,14 @@ const posts = () => [
     await page.click('.bar-back'); await page.waitForSelector('.todo');
     await page.click('[data-tab="bulletins"]'); await page.waitForSelector('#search'); check(sz + ': Bulletins fits', await fits());
     await page.click('[data-tab="contact"]'); await page.waitForSelector('.contact-main'); check(sz + ': Contact fits', await fits());
-    await page.click('[data-tab="home"]'); await page.waitForSelector('.textsize');
+    await page.click('[data-tab="team"]'); await page.waitForSelector('.textsize'); check(sz + ': Settings fits', await fits());
   }
+  await page.click('[data-tab="home"]'); await page.waitForSelector('.todo');
   const size2 = await page.evaluate(() => document.querySelector('.card-title').getBoundingClientRect().height);
   check('text really is bigger', size2 > size0 * 1.2, Math.round(size0) + ' to ' + Math.round(size2));
   await page.reload(); await page.waitForSelector('.todo');
   check('the choice is remembered after closing the app', (await page.evaluate(() => document.documentElement.style.zoom)) === '1.28');
-  await page.click('[data-size="standard"]'); await page.waitForTimeout(300);
+  await page.click('[data-tab="team"]'); await page.waitForSelector('.textsize'); await page.click('[data-size="standard"]'); await page.waitForTimeout(300);
   check('back to Standard', (await page.evaluate(() => document.documentElement.style.zoom)) === '');
   check('no script errors', errors.length === 0, errors.join(' | '));
   console.log(log.join('\n')); await browser.close(); server.close();

@@ -143,7 +143,9 @@ function world() {
 
   // Poster: own posts only, no Team tab.
   w = world(); s = await session(2, w); await s.page.waitForSelector('.post-card');
-  check('poster has no Team tab', (await s.page.$$('.tab')).length === 4);
+  await s.page.click('[data-tab="team"]'); await s.page.waitForSelector('.textsize');
+  check('poster gets Settings with text size but no Team tools', (await s.page.$$('.tab')).length === 5 && !(await s.page.$('[data-person-add]')) && !(await s.page.textContent('.screen')).includes('Add team member') && !s.sent.some(r => r.action === 'team'));
+  await s.page.click('[data-tab="home"]'); await s.page.waitForSelector('.post-card');
   await s.page.click('[data-open="a"]'); await s.page.waitForSelector('.post-body'); check('poster: no count on someone else\'s post', !(await s.page.$('.stats')));
   await s.page.click('[data-back]'); await s.page.waitForSelector('.post-row'); await s.page.click('.post-row'); await s.page.waitForSelector('.post-body');
   check('poster: count on their own post', !!(await s.page.$('button.stats')));
