@@ -891,6 +891,14 @@
     if (what === 'saveres' || what === 'removeres') return saveResource(what === 'removeres');
     if (what === 'leave') { closeSheet(); return closeCompose(); }
     if (what === 'post') return sendPost('');
+    if (what === 'picklater') {
+      var dd = state.draft; closeSheet();
+      if (!dd) return;
+      dd.when = 'later'; if (!dd.publishLocal) dd.publishLocal = localInput('');
+      saveDraft(); rerenderCompose();
+      var box = document.getElementById('f-when'); if (box) { box.scrollIntoView({ block: 'center' }); box.focus(); }
+      return toast('Pick the date and time, then tap Review and schedule');
+    }
     if (what === 'small' || what === 'real') return sendPost(what);
     if (what === 'archive') return archivePost();
   }
@@ -913,11 +921,13 @@
     var who = audienceWords(d);
     if (notOutYet(d)) {
       var lines = '<div class="sum"><span>Goes out</span><b>' + (later ? esc(whenFull(whenIso)) : 'Now') + '</b></div>' +
+        '<div class="sum"><span>Category</span><b>' + esc(cat(d.categoryId).name) + '</b></div>' +
         '<div class="sum"><span>Goes to</span><b>' + esc(who) + '</b></div>' +
         '<div class="sum"><span>Mark as read</span><b>' + (d.needsRead ? (d.readBy ? 'Yes, by ' + fullDate(d.readBy) : 'Yes') : 'Not needed') + '</b></div>' +
         (d.needsRead ? '<div class="sum"><span>Email</span><b>' + esc(emailLine(d, later)) + '</b></div>' : '');
       return sheet('<h2>' + (later ? 'Ready to schedule?' : 'Ready to post?') + '</h2><p class="sheet-title">' + esc(d.title.trim()) + '</p>' + lines +
-        '<button class="btn btn-primary" data-sheet="post">' + (later ? 'Schedule it' : 'Post now') + '</button><button class="btn btn-ghost" data-sheet="close">Keep editing</button>');
+        '<button class="btn btn-primary" data-sheet="post">' + (later ? 'Schedule it' : 'Post now') + '</button>' +
+        (later ? '' : '<button class="btn btn-outline" data-sheet="picklater">' + icon('clock') + 'Schedule for later</button>') + '<button class="btn btn-ghost" data-sheet="close">Keep editing</button>');
     }
     var p = byId(d.id);
     if (!d.needsRead || !(p && p.needsRead)) return sendPost('small');
