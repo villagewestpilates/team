@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VW Notification Test</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VW Test">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="../../icons/icon-180.png">
+<style>
+  body { margin: 0; background: #F3F3F1; color: #191919; font: 17px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 430px; margin: 0 auto; padding: calc(28px + env(safe-area-inset-top, 0px)) 24px 48px; }
+  h1 { font-size: 24px; line-height: 1.25; margin: 0 0 8px; }
+  p { margin: 0 0 16px; }
+  .muted { color: #5F5F5F; font-size: 15px; }
+  ol { padding-left: 22px; margin: 0 0 20px; }
+  li { margin-bottom: 8px; }
+  button { display: block; width: 100%; min-height: 54px; margin: 0 0 12px; border-radius: 14px; border: 1.5px solid #163D38; background: #163D38; color: #fff; font: inherit; font-weight: 600; }
+  button.second { background: transparent; color: #163D38; }
+  button:disabled { opacity: .5; }
+  #log { background: #fff; border-radius: 12px; padding: 14px 16px; font-size: 15px; white-space: pre-wrap; min-height: 48px; }
+  .box { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Notification test</h1>
+  <p class="muted">A test page only. It is separate from the team app and sends nothing to the team.</p>
+
+  <div class="box" id="install" hidden>
+    <p><strong>First, add this page to your Home Screen.</strong></p>
+    <ol>
+      <li>Tap the Share button in Safari.</li>
+      <li>Tap <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
+      <li>Open <strong>VW Test</strong> from your Home Screen and carry on there.</li>
+    </ol>
+  </div>
+
+  <button id="on">1. Turn on notifications</button>
+  <button id="send" class="second" disabled>2. Send me a test in 10 seconds</button>
+  <p class="muted">After tapping step 2, lock your phone and wait.</p>
+  <div id="log" role="status" aria-live="polite">Ready.</div>
+</main>
+<script>
+(function () {
+  var API = 'https://script.google.com/macros/s/AKfycbzDu7geWw1N3To2jvT2IJkNe1i0SiFgf0KgDIlJ-1HNNuUk2JVbOsrgq3okph2ibDRO/exec';
+  var log = document.getElementById('log'), on = document.getElementById('on'), send = document.getElementById('send');
+  function say(t) { log.textContent = t; }
+  function api(body) {
+    return fetch(API, { method: 'POST', credentials: 'omit', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.text(); })
+      .then(function (t) { try { return JSON.parse(t); } catch (e) { throw new Error('The test server has not been switched on yet.'); } });
+  }
+  function keyBytes(s) {
+    s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '=';
+    var raw = atob(s), out = new Uint8Array(raw.length); for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i); return out;
+  }
+  var standalone = window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  var isIos = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  if (isIos && !standalone) { document.getElementById('install').hidden = false; on.disabled = true; say('Waiting for you to open this from the Home Screen.'); }
+  else if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) { on.disabled = true; say('This browser does not support notifications from web apps.'); }
+
+  on.addEventListener('click', function () {
+    on.disabled = true; say('Asking for permission…');
+    Notification.requestPermission().then(function (perm) {
+      if (perm !== 'granted') throw new Error('Notifications were not allowed. Result: ' + perm + '.');
+      say('Allowed. Setting up…');
+      return navigator.serviceWorker.register('sw.js', { scope: './' });
+    }).then(function () { return navigator.serviceWorker.ready; })
+      .then(function (reg) { return api({ action: 'key' }).then(function (k) { if (!k.ok) throw new Error(k.message || 'No key.'); return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(k.key) }); }); })
+      .then(function (sub) { return api({ action: 'subscribe', endpoint: sub.endpoint }); })
+      .then(function (res) { if (!res.ok) throw new Error(res.message || 'Could not save.'); say('Notifications are on for this phone. Now tap step 2.'); send.disabled = false; })
+      .catch(function (err) { on.disabled = false; say('Step 1 did not finish.\n' + (err && err.message ? err.message : err)); });
+  });
+
+  send.addEventListener('click', function () {
+    send.disabled = true; say('Sending in 10 seconds. Lock your phone now.');
+    api({ action: 'send', wait: 10 }).then(function (res) {
+      send.disabled = false;
+      if (!res.ok) return say('The server could not send.\n' + (res.message || ''));
+      say('Sent.\n' + res.sent.map(function (s) { return s.host + ': ' + s.status + (s.body ? ' ' + s.body : ''); }).join('\n') + '\n(201 means the phone company accepted it.)');
+    }).catch(function (err) { send.disabled = false; say('Could not reach the test server.\n' + (err && err.message ? err.message : err)); });
+  });
+})();
+</script>
+</body>
+</html>
