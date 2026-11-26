@@ -1008,7 +1008,8 @@
     if (!e || e.skipped || e.mode === 'off') return word;
     if (e.quota) return word + '. The email didn\'t go out: today\'s limit is used up.';
     if (e.error) return word + '. The email didn\'t send, so nudge people later.';
-    if (e.mode === 'test') return e.sent ? word + '. One test email went to the test address only.' : word;
+    if (e.mode === 'test') return e.sent ? word + '. One test email went to the test address only.' + (e.push ? ' Your phone got a sample notification.' : '') : word;
+    if (e.push) { var n = e.sent + e.push; return word + ' and told ' + n + (n === 1 ? ' person' : ' people') + ' by notification or email'; }
     return e.sent ? word + ' and emailed ' + e.sent + (e.sent === 1 ? ' person' : ' people') : word;
   }
 
@@ -1178,10 +1179,71 @@
   function person(id) { return ((state.team && state.team.team) || []).filter(function (x) { return x.id === id; })[0]; }
   function linkFor(x) { return location.origin + location.pathname + '?k=' + x.token; }
 
+  /* ---------- Phone notifications (this phone only) ---------- */
+
+  var PUSH_KEY = 'vwp.push';
+  var push = { on: lsGet(PUSH_KEY) === '1', busy: false, checked: false };
+  /** 'ok', 'blocked', 'needs-home' (an iPhone that has not opened the app from its Home Screen), or 'none'. */
+  function pushSupport() {
+    var standalone = window.navigator.standalone === true || !!(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    var ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    if (ios && !standalone) return 'needs-home';
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return 'none';
+    if (Notification.permission === 'denied') return 'blocked';
+    return 'ok';
+  }
+  function pushSection() {
+    var s = pushSupport(), body;
+    if (s === 'needs-home') body = '<div class="card"><p>To get notifications on an iPhone, open the app from its Home Screen icon. How to add it is just below.</p></div>';
+    else if (s === 'none') body = '<div class="card"><p>This browser can\'t show notifications from the app.</p></div>';
+    else if (s === 'blocked') body = '<div class="card"><p>Notifications are blocked for this app on this phone. To allow them, open your phone\'s Settings, tap Notifications, then VW Team.</p></div>';
+    else {
+      checkPush();
+      body = '<div class="group" style="margin-top:0">' + toggle('push', push.on, 'Tell me when there\'s something new', 'A notification on this phone when a post needs your read. Email stays as the backup.').replace('data-toggle="push"', 'data-pushtoggle="1"') + '</div>';
+    }
+    return '<h2 class="section-label">Notifications on this phone</h2>' + body;
+  }
+  function pushReg() { return navigator.serviceWorker.getRegistration('./'); }
+  function redrawSettings() { if (state.view === 'tab' && state.tab === 'team') { var y = window.scrollY; render(); window.scrollTo(0, y); } }
+  /** Once per visit, make the switch match what this phone really has, and keep the server in step. */
+  function checkPush() {
+    if (push.checked) return; push.checked = true;
+    pushReg().then(function (reg) { return reg ? reg.pushManager.getSubscription() : null; }).then(function (sub) {
+      var on = !!sub && Notification.permission === 'granted';
+      if (on) api('pushOn', { endpoint: sub.endpoint }).catch(function () {});
+      if (on !== push.on) { push.on = on; lsSet(PUSH_KEY, on ? '1' : ''); redrawSettings(); }
+    }).catch(function () {});
+  }
+  function keyBytes(k) {
+    k = String(k).replace(/-/g, '+').replace(/_/g, '/'); while (k.length % 4) k += '=';
+    var raw = atob(k), out = new Uint8Array(raw.length); for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i); return out;
+  }
+  function setPush(turnOn) {
+    if (push.busy) return; push.busy = true;
+    var done = function (on, msg) { push.busy = false; push.on = on; lsSet(PUSH_KEY, on ? '1' : ''); redrawSettings(); toast(msg); };
+    if (turnOn) {
+      Promise.resolve(Notification.requestPermission()).then(function (perm) {
+        if (perm !== 'granted') { var e = new Error('perm'); e.notAllowed = true; throw e; }
+        return navigator.serviceWorker.register('sw.js', { scope: './' });
+      }).then(function () { return navigator.serviceWorker.ready; })
+        .then(function (reg) { return api('pushKey').then(function (k) { if (!k || !k.ok || !k.key) throw new Error('key'); return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(k.key) }); }); })
+        .then(function (sub) { return api('pushOn', { endpoint: sub.endpoint }).then(function (res) { if (!res || !res.ok) { try { sub.unsubscribe(); } catch (e) {} throw new Error('save'); } }); })
+        .then(function () { done(true, 'Notifications are on for this phone'); })
+        .catch(function (err) { done(false, err && err.notAllowed ? 'Notifications weren\'t allowed, so they\'re still off.' : 'That didn\'t work. Check your connection and try again.'); });
+    } else {
+      pushReg().then(function (reg) { return reg ? reg.pushManager.getSubscription() : null; }).then(function (sub) {
+        if (!sub) return;
+        return api('pushOff', { endpoint: sub.endpoint }).catch(function () {}).then(function () { return sub.unsubscribe(); });
+      }).then(function () { done(false, 'Notifications are off for this phone'); })
+        .catch(function () { done(false, 'Notifications are off for this phone'); });
+    }
+  }
+
   function mySettings() {
     var me = state.me;
     return '<h2 class="section-label"' + (hasTools() ? '' : ' style="margin-top:4px"') + '>Text size on this phone</h2>' + textSizeControl() +
       '<p class="fine" style="margin-top:10px">Makes everything in the app bigger. It only changes this phone.</p>' +
+      pushSection() +
       '<h2 class="section-label">Keep the app handy</h2><div class="card"><p><b>iPhone:</b> open your link in Safari, tap the Share button, then "Add to Home Screen."</p>' +
       '<p style="margin-top:10px"><b>Android:</b> open it in Chrome, tap the three dots, then "Add to Home screen."</p></div>' +
       '<h2 class="section-label">You</h2><div class="card"><div class="rows" style="margin-top:0">' +
@@ -1226,13 +1288,13 @@
   }
 
   var MODE_HINT = {
-    off: 'Nothing is emailed. People see new posts when they open the app.',
-    test: 'Every email goes only to the test address, marked as a test. The team gets nothing.',
-    live: 'New posts, real changes, and nudges email the team.'
+    off: 'Nothing is sent, by email or to phones. People see new posts when they open the app.',
+    test: 'Every email goes only to the test address, marked as a test. A sample notification goes only to your own phone. The team gets nothing.',
+    live: 'New posts, real changes, and nudges reach the team: a notification for people who turned them on, email for everyone else.'
   };
   function emailControl(t) {
     var m = t.emailMode || 'off';
-    return '<h2 class="section-label">Email</h2><div class="seg-group">' + [['off', 'Off'], ['test', 'Test'], ['live', 'Live']].map(function (x) {
+    return '<h2 class="section-label">Email and notifications</h2><div class="seg-group">' + [['off', 'Off'], ['test', 'Test'], ['live', 'Live']].map(function (x) {
       return '<button class="seg-btn' + (m === x[0] ? ' on' : '') + '" data-emailmode="' + x[0] + '" aria-pressed="' + (m === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>' +
       '<p class="fine" style="margin-top:10px">' + MODE_HINT[m] + (m === 'test' && t.testEmail ? ' Test address: ' + esc(t.testEmail) + '.' : '') +
       (m !== 'off' && t.emailsLeftToday != null ? ' Google allows ' + t.emailsLeftToday + ' more emails today.' : '') + '</p>';
@@ -1370,7 +1432,7 @@
   }
 
   function stage4Click(e) {
-    var t = e.target.closest('[data-settab],[data-ptools],[data-editmode],[data-size],[data-emailmode],[data-res-edit],[data-res-add],[data-res-clear],[data-rsec],[data-raud],[data-readers],[data-nudge],[data-person-open],[data-person-add],[data-cat-open],[data-setting],[data-teamreload],[data-prole],[data-papp],[data-swatch]');
+    var t = e.target.closest('[data-settab],[data-ptools],[data-editmode],[data-pushtoggle],[data-size],[data-emailmode],[data-res-edit],[data-res-add],[data-res-clear],[data-rsec],[data-raud],[data-readers],[data-nudge],[data-person-open],[data-person-add],[data-cat-open],[data-setting],[data-teamreload],[data-prole],[data-papp],[data-swatch]');
     if (!t) return false;
     if (t.hasAttribute('data-settab')) { state.setTab = t.getAttribute('data-settab'); if (state.setTab === 'team') state.team = null; render(); window.scrollTo(0, 0); return true; }
     if (t.hasAttribute('data-ptools')) {
@@ -1384,12 +1446,13 @@
       toast(turnOn ? 'Edit mode is on. Editing tools are showing.' : 'Edit mode is off. This is what the team sees.');
       return true;
     }
+    if (t.hasAttribute('data-pushtoggle')) { setPush(!push.on); return true; }
     if (t.hasAttribute('data-size')) { lsSet(SIZE_KEY, t.getAttribute('data-size')); applySize(); render(); toast('Text size saved for this phone'); return true; }
     if (t.hasAttribute('data-emailmode')) {
       var em = t.getAttribute('data-emailmode');
       if (em === (state.team && state.team.emailMode)) return true;
       if (em === 'live') {
-        sheet('<h2>Turn on email to the team?</h2><p>From now on, new posts, real changes, and nudges will email real team members. Nothing already posted gets sent.</p>' +
+        sheet('<h2>Turn on email and notifications to the team?</h2><p>From now on, new posts, real changes, and nudges will reach real team members, by phone notification or email. Nothing already posted gets sent.</p>' +
           '<button class="btn btn-primary" data-sheet="golive">Turn it on</button><button class="btn btn-ghost" data-sheet="close">Not yet</button>');
       } else setEmailMode(em);
       return true;

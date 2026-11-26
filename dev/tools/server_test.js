@@ -7,8 +7,15 @@ const log = []; const check = (n, ok, x) => log.push((ok ? 'PASS ' : 'FAIL ') + 
 function makeWorld() {
   const tables = {}; let uid = 0;
   const ctx = { console, JSON, Date, Math, Number, String, Object, Array, isNaN, RegExp,
-    Utilities: { getUuid: () => require("crypto").randomUUID(), formatDate: (d, tz, f) => f === 'EEE, MMM d' ? new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short', month: 'short', day: 'numeric' }).format(d) : new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d) },
-    PropertiesService: { getScriptProperties: () => ({ getProperty: k => ({ SEED_VERSION: '99', SHEET_ID: 'x' }[k] || null), setProperty() {} }) },
+    Utilities: { DigestAlgorithm: { SHA_256: 'sha256' },
+      computeDigest: (a, str) => [...require('crypto').createHash('sha256').update(String(str)).digest()].map(b => b > 127 ? b - 256 : b),
+      computeHmacSha256Signature: (data, key) => [...require('crypto').createHmac('sha256', Buffer.from(key.map(b => b & 255))).update(Buffer.from(data.map(b => b & 255))).digest()].map(b => b > 127 ? b - 256 : b),
+      base64EncodeWebSafe: bytes => Buffer.from(bytes.map(b => b & 255)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_'),
+      base64DecodeWebSafe: str => [...Buffer.from(str, 'base64url')].map(b => b > 127 ? b - 256 : b),
+      newBlob: str => ({ getBytes: () => [...Buffer.from(String(str))].map(b => b > 127 ? b - 256 : b) }),
+      getUuid: () => require("crypto").randomUUID(), formatDate: (d, tz, f) => f === 'EEE, MMM d' ? new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short', month: 'short', day: 'numeric' }).format(d) : new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d) },
+    PropertiesService: (() => { const store = { SEED_VERSION: '99', SHEET_ID: 'x' }; return { getScriptProperties: () => ({ getProperty: k => store[k] || null, setProperty: (k, v) => { store[k] = String(v); } }) }; })(),
+    UrlFetchApp: { fetchAll: reqs => reqs.map(() => ({ getResponseCode: () => 201 })) },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     SpreadsheetApp: { flush() {} }, ContentService: {}, MailApp: { sendEmail() {}, getRemainingDailyQuota: () => 1500 }, ScriptApp: {}, Logger: { log() {} } };
   vm.createContext(ctx); vm.runInContext(code, ctx);
