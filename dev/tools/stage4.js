@@ -23,7 +23,7 @@ function world() {
 }
 (async () => {
   await new Promise(r => server.listen(8769, r));
-  const browser = await chromium.launch(); const base = 'http://localhost:8769/';
+  const browser = await chromium.launch(); /* The checks always run as if it were this moment, so dates in them never go stale. */ { const nc = browser.newContext.bind(browser); browser.newContext = async o => { const c = await nc(o); await c.clock.setFixedTime(new Date('2026-11-25T18:44:00Z')); return c; }; } const base = 'http://localhost:8769/';
   async function session(meIdx, w) {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: ['clipboard-read', 'clipboard-write'] }); await ctx.addInitScript(() => { try { localStorage.setItem('vwp.edit', '1'); } catch (e) {} });
     const page = await ctx.newPage(); const errors = []; const sent = [];

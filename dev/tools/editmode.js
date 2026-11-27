@@ -19,7 +19,7 @@ const world = role => ({ ok: true, me: { id: 'p0', name: 'Adam Caldwell', firstN
   contacts: [] });
 (async () => {
   await new Promise(r => server.listen(8776, r));
-  const browser = await chromium.launch(); const base = 'http://localhost:8776/';
+  const browser = await chromium.launch(); /* The checks always run as if it were this moment, so dates in them never go stale. */ { const nc = browser.newContext.bind(browser); browser.newContext = async o => { const c = await nc(o); await c.clock.setFixedTime(new Date('2026-11-25T18:44:00Z')); return c; }; } const base = 'http://localhost:8776/';
   async function open(role) {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
     const page = await ctx.newPage(); const errors = []; page.on('pageerror', e => errors.push(String(e)));

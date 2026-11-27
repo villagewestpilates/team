@@ -36,7 +36,7 @@ async function run(browser, reduce) {
 }
 (async () => {
   await new Promise(r => server.listen(8777, r));
-  const browser = await chromium.launch();
+  const browser = await chromium.launch(); /* The checks always run as if it were this moment, so dates in them never go stale. */ { const nc = browser.newContext.bind(browser); browser.newContext = async o => { const c = await nc(o); await c.clock.setFixedTime(new Date('2026-11-25T18:44:00Z')); return c; }; }
   await run(browser, false); await run(browser, true);
   console.log(log.join('\n')); await browser.close(); server.close();
 })().catch(e => { console.log(log.join('\n')); console.error(e); process.exit(1); });

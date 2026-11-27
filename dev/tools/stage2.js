@@ -43,7 +43,7 @@ function fullSet() {
 const log = [];
 (async () => {
   await new Promise(r => server.listen(8767, r));
-  const browser = await chromium.launch();
+  const browser = await chromium.launch(); /* The checks always run as if it were this moment, so dates in them never go stale. */ { const nc = browser.newContext.bind(browser); browser.newContext = async o => { const c = await nc(o); await c.clock.setFixedTime(new Date('2026-11-25T18:44:00Z')); return c; }; }
   const base = 'http://localhost:8767/';
   const check = (name, ok, extra) => { log.push((ok ? 'PASS ' : 'FAIL ') + name + (extra ? '  [' + extra + ']' : '')); };
 

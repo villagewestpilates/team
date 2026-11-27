@@ -840,7 +840,7 @@
       '<button class="more-btn" data-more="1" aria-expanded="' + !!d.more + '">' + (d.more ? 'Fewer options' : 'More options') + icon(d.more ? 'chevron-left' : 'chevron-right') + '</button>' +
       (d.more ? '<div class="more">' +
         '<div class="group">' + toggle('pinned', d.pinned, 'Pin to the top', 'Stays first in Bulletins until you unpin it.') +
-          toggle('skipEmail', d.skipEmail, 'Skip the email for this post', 'People will only see it when they open the app.') + '</div>' +
+          toggle('skipEmail', d.skipEmail, 'Don\'t notify people about this post', 'No email and no phone notification. People will only see it when they open the app.') + '</div>' +
         (d.needsRead ? '<label class="lbl" for="f-btn">Wording for the Mark as read button <span class="opt">optional</span></label><input class="input" id="f-btn" data-f="buttonText" maxlength="40" placeholder="Mark as read" value="' + esc(d.buttonText) + '">' : '') +
         '<div class="lbl">Link buttons <span class="opt">up to two</span></div>' + linkRows + postAs(d) +
         (editing ? '<button class="danger-link" data-archive="1">Remove this post</button>' : '') +
@@ -962,6 +962,7 @@
     var d = state.draft;
     if (!d.title.trim()) { toast('Add a title'); return focusField('f-title'); }
     if (!d.body.trim()) { toast('Add the post text'); return focusField('f-body'); }
+    if (d.needsRead && d.readBy && d.readBy < dayKey(new Date())) { toast('The read-by date has already passed. Pick a new date or clear it.'); return focusField('f-readby'); }
     if (d.audience === 'people' && !d.audienceIds.length) return toast('Pick at least one person');
     for (var i = 0; i < 2; i++) {
       var l = d.links[i];
@@ -977,7 +978,7 @@
         '<div class="sum"><span>Category</span><b>' + esc(cat(d.categoryId).name) + '</b></div>' +
         '<div class="sum"><span>Goes to</span><b>' + esc(who) + '</b></div>' +
         '<div class="sum"><span>Mark as read</span><b>' + (d.needsRead ? (d.readBy ? 'Yes, by ' + fullDate(d.readBy) : 'Yes') : 'Not needed') + '</b></div>' +
-        (d.needsRead ? '<div class="sum"><span>Email</span><b>' + esc(emailLine(d, later)) + '</b></div>' : '');
+        (d.needsRead ? '<div class="sum"><span>Notify</span><b>' + esc(emailLine(d, later)) + '</b></div>' : '');
       return sheet('<h2>' + (later ? 'Ready to schedule?' : 'Ready to post?') + '</h2><p class="sheet-title">' + esc(d.title.trim()) + '</p>' + lines +
         '<button class="btn btn-primary" data-sheet="post">' + (later ? 'Schedule it' : 'Post now') + '</button>' +
         (later ? '' : '<button class="btn btn-outline" data-sheet="picklater">' + icon('clock') + 'Schedule for later</button>') + '<button class="btn btn-ghost" data-sheet="close">Keep editing</button>');

@@ -21,7 +21,7 @@ const visible = (all, role, apprentice) => all.filter(r => !r.archived && (role 
 
 (async () => {
   await new Promise(r => server.listen(8772, r));
-  const browser = await chromium.launch(); const base = 'http://localhost:8772/';
+  const browser = await chromium.launch(); /* The checks always run as if it were this moment, so dates in them never go stale. */ { const nc = browser.newContext.bind(browser); browser.newContext = async o => { const c = await nc(o); await c.clock.setFixedTime(new Date('2026-11-25T18:44:00Z')); return c; }; } const base = 'http://localhost:8772/';
   async function session(role, apprentice) {
     const all = ALL(); let n = 50;
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 }); await ctx.addInitScript(() => { try { localStorage.setItem('vwp.edit', '1'); } catch (e) {} });
