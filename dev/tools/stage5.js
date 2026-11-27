@@ -15,22 +15,23 @@ const ALL = () => [
   ['How-to videos', 'everyone', 'Setting the alarm', 'https://drive.google.com/file/d/4/view'], ['How-to videos', 'everyone', 'Thermostat', 'https://drive.google.com/file/d/5/view'],
   ['Apprentices', 'apprentices', 'Co-Teaching Sign Up', 'https://docs.google.com/spreadsheets/d/6/edit'], ['Apprentices', 'apprentices', 'Apprentice Meetings recordings', 'https://drive.google.com/drive/folders/7'],
   ['Admins', 'admins', 'Intermediate Class Approval SOP', 'https://docs.google.com/document/d/8/edit']
-].map((r, i) => ({ id: 'r' + i, section: r[0], audience: r[1], title: r[2], url: r[3] }));
-const CONTACTS = [{ name: 'The studio', label: 'Text the studio', phone: '+14435550100', primary: true }, { name: 'Bethany', label: 'Text Bethany', phone: '+14435550101' }, { name: 'Cole', label: 'Text Cole', phone: '+14435550102' }, { name: 'Adam', label: 'Text Adam', phone: '+12145550103' }];
+].map((r, i) => ({ id: 'r' + i, section: r[0], audience: r[1], title: r[2], url: r[3], about: /Binder/.test(r[2]) ? 'Opening and closing steps, and front desk how-tos' : '', words: /Binder/.test(r[2]) ? 'lock up, end of day' : '' }));
+const CONTACTS = () => [{ name: 'The studio', label: 'Text the studio', phone: '+14435550100', primary: true }, { name: 'Bethany', label: 'Text Bethany', phone: '+14435550101', note: 'Sub cover and schedule changes' }, { name: 'Cole', label: 'Text Cole', phone: '+14435550102', call: true }, { name: 'Adam', label: 'Text Adam', phone: '+12145550103' }];
 const visible = (all, role, apprentice) => all.filter(r => !r.archived && (role === 'admin' || (r.url && (r.audience === 'everyone' || (r.audience === 'apprentices' && apprentice)))));
 
 (async () => {
   await new Promise(r => server.listen(8772, r));
   const browser = await chromium.launch(); /* The checks always run as if it were this moment, so dates in them never go stale. */ { const nc = browser.newContext.bind(browser); browser.newContext = async o => { const c = await nc(o); await c.clock.setFixedTime(new Date('2026-11-25T18:44:00Z')); return c; }; } const base = 'http://localhost:8772/';
   async function session(role, apprentice) {
-    const all = ALL(); let n = 50;
+    const all = ALL(); let n = 50; let contacts = CONTACTS();
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 }); await ctx.addInitScript(() => { try { localStorage.setItem('vwp.edit', '1'); } catch (e) {} });
     const page = await ctx.newPage(); const errors = []; const sent = [];
     page.on('pageerror', e => errors.push(String(e)));
     await page.route('**/script.google.com/**', async route => {
       const req = JSON.parse(route.request().postData() || '{}'); let out = { ok: true };
-      if (req.action === 'boot') out = { ok: true, me: { id: 'p0', name: 'Molly Hartman', firstName: 'Molly', role, apprentice }, settings: { beta: true }, categories: [], posts: [], canPost: role !== 'member', people: [], resources: visible(all, role, apprentice), contacts: CONTACTS };
-      else if (req.action === 'saveResource') { sent.push(req.resource); const d = req.resource; if (d.id) Object.assign(all.find(r => r.id === d.id), { title: d.title, url: d.url, section: d.section, audience: d.audience, archived: d.archived }); else all.push({ id: 'r' + (n++), title: d.title, url: d.url, section: d.section, audience: d.audience }); out = { ok: true, resources: visible(all, role, apprentice) }; }
+      if (req.action === 'boot') out = { ok: true, me: { id: 'p0', name: 'Molly Hartman', firstName: 'Molly', role, apprentice }, settings: { beta: true }, categories: [], posts: [], canPost: role !== 'member', people: [], resources: visible(all, role, apprentice), contacts };
+      else if (req.action === 'saveContacts') { sent.push({ contacts: req.contacts }); if (req.contacts.filter(c => c.primary).length !== 1) out = { ok: false, message: 'Pick one number as the main studio line.' }; else { contacts = req.contacts; out = { ok: true, contacts }; } }
+      else if (req.action === 'saveResource') { sent.push(req.resource); const d = req.resource; if (d.id) Object.assign(all.find(r => r.id === d.id), { title: d.title, url: d.url, section: d.section, audience: d.audience, archived: d.archived, about: d.about, words: d.words }); else all.push({ id: 'r' + (n++), title: d.title, url: d.url, section: d.section, audience: d.audience }); out = { ok: true, resources: visible(all, role, apprentice) }; }
       route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(out) });
     });
     await page.goto(base + '?k=' + 'k'.repeat(30)); await page.waitForSelector('#tabbar:not([hidden])');
@@ -51,14 +52,23 @@ const visible = (all, role, apprentice) => all.filter(r => !r.archived && (role 
   await shot(pg, '01-resources-member');
   await pg.fill('#res-search', 'alarm'); await pg.waitForTimeout(150);
   check('search finds one and keeps its section heading', (await pg.$$('a.res-row')).length === 1 && (await labels(pg)).join() === 'How-to videos');
+  await pg.fill('#res-search', 'closing'); await pg.waitForTimeout(150);
+  check('searching for what it is for finds it', (await pg.$$eval('a.res-row .res-title', e => e.map(x => x.textContent))).join() === 'Instructor Front Desk Binder');
+  check('the one-line description shows under the name', (await pg.textContent('a.res-row .res-sub')) === 'Opening and closing steps, and front desk how-tos');
+  await pg.fill('#res-search', 'lock up'); await pg.waitForTimeout(150);
+  check('hidden search words find it too, and are never shown', (await pg.$$('a.res-row')).length === 1 && !(await pg.textContent('#res-list')).includes('lock up'));
   await pg.fill('#res-search', 'zzz'); await pg.waitForTimeout(150); check('search empty state', (await pg.textContent('.empty .calm-title')) === 'Nothing matches');
+  check('nothing found offers a way to ask', !!(await pg.$('.empty [data-tab="contact"]')) && (await pg.textContent('.empty .calm-sub')) === 'Try a shorter word, or ask the studio where it lives.');
   await pg.click('[data-res-clear]'); await pg.waitForTimeout(150); check('clear brings everything back', (await pg.$$('a.res-row')).length === 6);
   // Contact
   await pg.click('[data-tab="contact"]'); await pg.waitForSelector('.contact-main'); await pg.waitForTimeout(300);
   const hrefs = await pg.$$eval('.screen a[href^="sms:"]', e => e.map(a => a.getAttribute('href') + '|' + a.target));
   check('four Text buttons with sms links in new tabs, studio first', hrefs.join(',') === 'sms:+14435550100|_blank,sms:+14435550101|_blank,sms:+14435550102|_blank,sms:+12145550103|_blank', hrefs.join(','));
   check('studio is the big one, number shown plainly', (await pg.textContent('.contact-main-title')) === 'Text the studio' && (await pg.textContent('.contact-num')) === '(443) 555-0100');
-  check('tap targets at least 44px', await pg.$$eval('.screen a[href^="sms:"]', e => e.every(a => a.getBoundingClientRect().height >= 44)));
+  check('tap targets at least 44px', await pg.$$eval('.screen a[href^="sms:"], .screen a[href^="tel:"]', e => e.every(a => a.getBoundingClientRect().height >= 44)));
+  check('it says what to reach each person about', (await pg.$$eval('.person-row', e => e.map(r => r.innerText.replace(/\n+/g, ' | ')))).find(t => t.startsWith('Bethany')).includes('Sub cover and schedule changes'));
+  check('a Call button shows only where it is switched on', (await pg.$$eval('.screen a[href^="tel:"]', e => e.map(a => a.getAttribute('href')))).join() === 'tel:+14435550102');
+  check('team member cannot edit contacts', !(await pg.$('[data-contact-edit]')));
   check('no side scroll', await pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
   await shot(pg, '02-contact');
   check('no script errors (member)', s.errors.length === 0, s.errors.join(' | '));
@@ -90,6 +100,34 @@ const visible = (all, role, apprentice) => all.filter(r => !r.archived && (role 
   await pg.click('[data-sheet="removeres"]'); await pg.waitForTimeout(500);
   check('removed resource is gone', !(await pg.textContent('#res-list')).includes('Thermostat'));
   check('no script errors (admin)', s.errors.length === 0, s.errors.join(' | '));
+  await s.ctx.close();
+
+  // An admin with Edit mode on keeps the contact list up to date.
+  s = await session('admin', false); pg = s.page;
+  await pg.click('[data-tab="contact"]'); await pg.waitForSelector('.contact-main'); await pg.waitForTimeout(300);
+  check('admin sees a pencil on each person, an edit link for the studio line, and Add', (await pg.$$('.res-item [data-contact-edit]')).length === 3 && !!(await pg.$('.contact-main [data-contact-edit]')) && !!(await pg.$('[data-contact-edit="new"]')));
+  await shot(pg, '05-contact-admin');
+  await pg.click('.res-item [data-contact-edit="1"]'); await pg.waitForSelector('.sheet #cf-name');
+  check('the form opens filled in', (await pg.inputValue('#cf-name')) === 'Bethany' && (await pg.inputValue('#cf-phone')) === '(443) 555-0101' && (await pg.inputValue('#cf-note')) === 'Sub cover and schedule changes');
+  await shot(pg, '06-contact-form');
+  await pg.fill('#cf-note', 'Payroll and time off'); await pg.click('[data-cf="call"]'); await pg.click('[data-sheet="savecontact"]'); await pg.waitForTimeout(350);
+  let sc = s.sent.filter(x => x.contacts).pop().contacts;
+  check('saving sends the whole list with the change', sc.length === 4 && sc[1].note === 'Payroll and time off' && sc[1].call === true && sc[1].phone === '4435550101' && sc.filter(c => c.primary).length === 1, JSON.stringify(sc[1]));
+  check('the screen shows the change', (await pg.textContent('.screen')).includes('Payroll and time off') && (await toast(pg)) === 'Saved');
+  await pg.click('[data-contact-edit="new"]'); await pg.waitForSelector('.sheet #cf-name');
+  await pg.click('[data-sheet="savecontact"]'); await pg.waitForTimeout(150); check('a contact needs a name', (await toast(pg)) === 'Add a name');
+  await pg.fill('#cf-name', 'Dana'); await pg.fill('#cf-phone', '12'); await pg.waitForTimeout(2600); await pg.click('[data-sheet="savecontact"]'); await pg.waitForTimeout(150);
+  check('a short number is caught', (await toast(pg)) === 'That number doesn\'t look right');
+  await pg.fill('#cf-phone', '(443) 555-0199'); await pg.click('[data-sheet="savecontact"]'); await pg.waitForTimeout(350);
+  check('a new contact is added at the end', (await pg.$$('.person-row')).length === 4 && s.sent.filter(x => x.contacts).pop().contacts[4].name === 'Dana');
+  await pg.click('.contact-main [data-contact-edit]'); await pg.waitForSelector('.sheet #cf-name');
+  check('the studio line cannot be removed', !(await pg.$('[data-sheet="removecontact"]')));
+  await pg.waitForTimeout(2600); await pg.click('[data-cf="primary"]'); await pg.click('[data-sheet="savecontact"]'); await pg.waitForTimeout(150);
+  check('the main line cannot be switched off directly', (await toast(pg)).startsWith('To change the main studio line'));
+  await pg.click('[data-sheet="close"]'); await pg.waitForTimeout(300);
+  await pg.click('.res-item [data-contact-edit="4"]'); await pg.waitForSelector('.sheet #cf-name'); await pg.click('[data-sheet="removecontact"]'); await pg.waitForTimeout(350);
+  check('a contact can be removed', (await pg.$$('.person-row')).length === 3 && s.sent.filter(x => x.contacts).pop().contacts.length === 4);
+  check('no script errors (contact admin)', s.errors.length === 0, s.errors.join(' | '));
   await s.ctx.close();
 
   // The public "link didn't work" screen uses the studio line, not a personal number.
