@@ -44,14 +44,17 @@ You keep it current. The owner never has to.
 - Never trade away security, privacy, data integrity, existing functionality, accessibility, or recoverability for speed. Name any technical debt you introduce and why.
 - At the start of significant work, check whether a newer official capability would make it simpler. Do not adopt something only because it is new.
 
+## How approval works
+
+The owner does not want to be asked "Approved?" before each piece of work. Build and test without asking, then send one approval link (a pull request). The owner's tap on Merge is the approval, and it is the only point where anything goes live. Never merge yourself.
+
 ## Always ask first
 
-Stop and get the owner's approval before anything that:
+These still need a clear yes in the conversation before you act, because a merge tap does not cover them:
 
-- changes what the team sees, or publishes to `main` (the live app)
 - sends email or any message to the team, or switches email out of test mode
 - changes someone's access, role, or personal link
-- touches the production Apps Script deployment or the data Sheet
+- deploys to the production Apps Script project, or edits the data Sheet directly
 - costs money, needs a new account, or needs a new permission
 - affects brand, product direction, or user experience in a meaningful way
 - cannot be undone
