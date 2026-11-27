@@ -12,7 +12,7 @@ const log = []; const check = (n, ok, x) => log.push((ok ? 'PASS ' : 'FAIL ') + 
 const base0 = { categoryId: 'c', pinned: false, needsRead: true, readBy: '', eventDate: '', updated: false, buttonText: '', links: [], forMe: true, photo: null };
 (async () => {
   await new Promise(r => server.listen(8773, r));
-  const browser = await chromium.launch(); const base = 'http://localhost:8773/';
+  const browser = await chromium.launch(); /* The checks always run as if it were this moment, so dates in them never go stale. */ { const nc = browser.newContext.bind(browser); browser.newContext = async o => { const c = await nc(o); await c.clock.setFixedTime(new Date('2026-11-25T18:44:00Z')); return c; }; } const base = 'http://localhost:8773/';
   const ctx = await browser.newContext(Object.assign({}, devices['iPhone 13'])); await ctx.addInitScript(() => { try { localStorage.setItem('vwp.edit', '1'); } catch (e) {} });
   const page = await ctx.newPage(); const errors = []; const sent = []; page.on('pageerror', e => errors.push(String(e)));
   const cdp = await ctx.newCDPSession(page);

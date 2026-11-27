@@ -20,7 +20,7 @@ function fakePhone(o) {
 
 (async () => {
   await new Promise(r => server.listen(8793, r));
-  const browser = await chromium.launch({ args: ['--no-proxy-server'] }); const base = 'http://localhost:8793/';
+  const browser = await chromium.launch({ args: ['--no-proxy-server'] }); /* The checks always run as if it were this moment, so dates in them never go stale. */ { const nc = browser.newContext.bind(browser); browser.newContext = async o => { const c = await nc(o); await c.clock.setFixedTime(new Date('2026-11-25T18:44:00Z')); return c; }; } const base = 'http://localhost:8793/';
   async function session(o) {
     const ctx = await browser.newContext(Object.assign({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 }, o.ua ? { userAgent: o.ua } : {}));
     await ctx.addInitScript(fakePhone, o); const page = await ctx.newPage(); const errors = [], sent = [];
@@ -84,7 +84,7 @@ function fakePhone(o) {
   // 6. The worker file itself
   const sw = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
   check('the worker only handles notifications and never intercepts page loads', /addEventListener\('push'/.test(sw) && /notificationclick/.test(sw) && !/addEventListener\('fetch'/.test(sw) && !/caches\./.test(sw));
-  check('the notification wording has no emoji, dash, or names', /There\\'s something new for you to read\./.test(sw));
+  check('the notification wording has no emoji, dash, or names', /showNotification\('Something new to read', \{\s+body: 'Open the app to see it\.'/.test(sw));
 
   console.log(log.join('\n'));
   await browser.close(); server.close();

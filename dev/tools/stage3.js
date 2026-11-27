@@ -17,7 +17,7 @@ const check = (name, ok, extra) => log.push((ok ? 'PASS ' : 'FAIL ') + name + (e
 
 (async () => {
   await new Promise(r => server.listen(8768, r));
-  const browser = await chromium.launch(); const base = 'http://localhost:8768/';
+  const browser = await chromium.launch(); /* The checks always run as if it were this moment, so dates in them never go stale. */ { const nc = browser.newContext.bind(browser); browser.newContext = async o => { const c = await nc(o); await c.clock.setFixedTime(new Date('2026-11-25T18:44:00Z')); return c; }; } const base = 'http://localhost:8768/';
   async function session(role, posts) {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 }); await ctx.addInitScript(() => { try { localStorage.setItem('vwp.edit', '1'); } catch (e) {} });
     const page = await ctx.newPage(); const errors = []; const sent = [];
@@ -75,6 +75,9 @@ const check = (name, ok, extra) => log.push((ok ? 'PASS ' : 'FAIL ') + name + (e
   await s.page.click('[data-submit]'); await s.page.waitForTimeout(200);
   check('selected people needs at least one', (await toastText(s.page)) === 'Pick at least one person');
   await s.page.click('[data-person="p1"]'); await s.page.click('[data-person="p5"]');
+  await s.page.fill('#f-readby', '2026-11-20'); await s.page.click('[data-submit]'); await s.page.waitForTimeout(200);
+  check('a read-by date that has passed is caught before the review step', (await toastText(s.page)) === 'The read-by date has already passed. Pick a new date or clear it.' && !(await s.page.$('.sheet')));
+  await s.page.waitForTimeout(2600);
   await s.page.fill('#f-readby', '2026-11-27');
   await s.page.screenshot({ path: path.join(OUT, '03-compose-filled-full.png'), fullPage: true });
   await s.page.click('[data-more]'); await s.page.waitForSelector('#f-btn');

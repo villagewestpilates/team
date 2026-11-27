@@ -4,8 +4,8 @@ self.addEventListener('activate', function (e) { e.waitUntil(self.clients.claim(
 
 /* The server sends no post content, so the wording lives here. */
 self.addEventListener('push', function (e) {
-  e.waitUntil(self.registration.showNotification('Village West Team', {
-    body: 'There\'s something new for you to read.',
+  e.waitUntil(self.registration.showNotification('Something new to read', {
+    body: 'Open the app to see it.',
     icon: 'icons/icon-192.png',
     tag: 'vw-new'
   }));
