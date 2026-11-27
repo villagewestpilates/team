@@ -133,5 +133,21 @@ check('nobody can switch off their own', r.ok && w.call(adam, { action: 'team' }
 r = w.call(adam, { action: 'savePerson', person: { id: molly.PersonId, name: 'Molly Test', email: 'molly@example.com', role: 'member', tools: true } });
 check('editing tools never apply to a Team member', w.call(molly, { action: 'boot', quiet: true }).me.tools === false && w.call(molly, { action: 'savePost', post: Object.assign({ title: 'x' }, base) }).code === 'forbidden');
 
+// Resources: descriptions and search words
+r = w.call(adam, { action: 'saveResource', resource: { title: 'Front Desk Binder', url: 'https://example.com/b', section: 'Documents', audience: 'everyone', about: '  Opening and   closing steps ', words: 'lock up, end of day' } });
+check('a resource keeps its description and search words, tidied', r.ok && r.resources.find(x => x.title === 'Front Desk Binder').about === 'Opening and closing steps' && r.resources.find(x => x.title === 'Front Desk Binder').words === 'lock up, end of day');
+check('team members receive them so search works', w.call(molly, { action: 'boot', quiet: true }).resources.find(x => x.title === 'Front Desk Binder').about === 'Opening and closing steps');
+check('a very long description is trimmed', w.call(adam, { action: 'saveResource', resource: { title: 'Long', url: 'https://example.com/l', section: 'Documents', about: 'x'.repeat(500) } }).resources.find(x => x.title === 'Long').about.length === 120);
+
+// Contacts
+const C = [{ name: 'The studio', phone: '(443) 555-0100', primary: true, note: 'Client updates' }, { name: ' Bethany ', phone: '4435550101', note: 'Sub cover', call: true }];
+check('only admins with editing tools can change contacts', w.call(molly, { action: 'saveContacts', contacts: C }).code === 'forbidden' && w.call(chris, { action: 'saveContacts', contacts: C }).code === 'forbidden');
+r = w.call(adam, { action: 'saveContacts', contacts: C });
+check('contacts save with tidy numbers and labels', r.ok && r.contacts[0].phone === '+14435550100' && r.contacts[1].phone === '+14435550101' && r.contacts[1].name === 'Bethany' && r.contacts[1].label === 'Text Bethany' && r.contacts[1].call === true && r.contacts[0].call === false, JSON.stringify(r.contacts));
+w.ctx.setting_ = key => (w.tables.Settings.find(x => x.Key === key) || {}).Value || '';
+check('the team sees the saved contacts and what each is for', w.call(molly, { action: 'boot', quiet: true }).contacts.map(c => c.name + ':' + c.note).join('|') === 'The studio:Client updates|Bethany:Sub cover');
+check('there must be exactly one main studio line', w.call(adam, { action: 'saveContacts', contacts: [C[1]] }).ok === false && w.call(adam, { action: 'saveContacts', contacts: [C[0], Object.assign({}, C[1], { primary: true })] }).ok === false);
+check('a bad number or missing name is refused', w.call(adam, { action: 'saveContacts', contacts: [C[0], { name: 'X', phone: '12' }] }).ok === false && w.call(adam, { action: 'saveContacts', contacts: [C[0], { name: '', phone: '4435550101' }] }).ok === false && w.call(adam, { action: 'saveContacts', contacts: [] }).ok === false);
+
 console.log(log.join('\n'));
 console.log('server pass=' + log.filter(l => l.startsWith('PASS')).length + ' fail=' + log.filter(l => l.startsWith('FAIL')).length);

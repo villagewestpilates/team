@@ -942,6 +942,7 @@
     if (what === 'close') return closeSheet();
     if (teamSheetAction(what, arg)) return;
     if (what === 'saveres' || what === 'removeres') return saveResource(what === 'removeres');
+    if (what === 'savecontact' || what === 'removecontact') return saveContact(what === 'removecontact');
     if (what === 'leave') { closeSheet(); return closeCompose(); }
     if (what === 'post') return sendPost('');
     if (what === 'picklater') {
@@ -1433,7 +1434,7 @@
   }
 
   function stage4Click(e) {
-    var t = e.target.closest('[data-settab],[data-ptools],[data-editmode],[data-pushtoggle],[data-size],[data-emailmode],[data-res-edit],[data-res-add],[data-res-clear],[data-rsec],[data-raud],[data-readers],[data-nudge],[data-person-open],[data-person-add],[data-cat-open],[data-setting],[data-teamreload],[data-prole],[data-papp],[data-swatch]');
+    var t = e.target.closest('[data-settab],[data-ptools],[data-editmode],[data-pushtoggle],[data-contact-edit],[data-cf],[data-size],[data-emailmode],[data-res-edit],[data-res-add],[data-res-clear],[data-rsec],[data-raud],[data-readers],[data-nudge],[data-person-open],[data-person-add],[data-cat-open],[data-setting],[data-teamreload],[data-prole],[data-papp],[data-swatch]');
     if (!t) return false;
     if (t.hasAttribute('data-settab')) { state.setTab = t.getAttribute('data-settab'); if (state.setTab === 'team') state.team = null; render(); window.scrollTo(0, 0); return true; }
     if (t.hasAttribute('data-ptools')) {
@@ -1448,6 +1449,12 @@
       return true;
     }
     if (t.hasAttribute('data-pushtoggle')) { setPush(!push.on); return true; }
+    if (t.hasAttribute('data-contact-edit')) { contactForm(t.getAttribute('data-contact-edit')); return true; }
+    if (t.hasAttribute('data-cf')) {
+      var cfk = t.getAttribute('data-cf'); state.contactForm[cfk] = !state.contactForm[cfk];
+      t.setAttribute('aria-checked', state.contactForm[cfk]); t.querySelector('.switch').classList.toggle('on', state.contactForm[cfk]);
+      return true;
+    }
     if (t.hasAttribute('data-size')) { lsSet(SIZE_KEY, t.getAttribute('data-size')); applySize(); render(); toast('Text size saved for this phone'); return true; }
     if (t.hasAttribute('data-emailmode')) {
       var em = t.getAttribute('data-emailmode');
@@ -1517,10 +1524,10 @@
   }
   function resourceList() {
     var admin = state.me.role === 'admin' && editing(), q = state.resSearch.trim().toLowerCase();
-    var list = state.resources.filter(function (r) { return (admin || r.url) && (!q || (r.title + ' ' + r.section).toLowerCase().indexOf(q) !== -1); });
+    var list = state.resources.filter(function (r) { return (admin || r.url) && (!q || (r.title + ' ' + r.section + ' ' + (r.about || '') + ' ' + (r.words || '')).toLowerCase().indexOf(q) !== -1); });
     if (!list.length) {
       return '<div class="empty"><div class="bubble sm">' + icon(q ? 'search' : 'layout-grid') + '</div><div class="calm-title">' + (q ? 'Nothing matches' : 'No resources yet') + '</div>' +
-        '<div class="calm-sub">' + (q ? 'Try a shorter word.' : 'Forms, documents, and links will show up here.') + '</div>' + (q ? '<button class="btn btn-outline sm" data-res-clear="1">Show everything</button>' : '') + '</div>';
+        '<div class="calm-sub">' + (q ? 'Try a shorter word, or ask the studio where it lives.' : 'Forms, documents, and links will show up here.') + '</div>' + (q ? '<button class="btn btn-outline sm" data-res-clear="1">Show everything</button><button class="link-btn" data-tab="contact" style="margin-top:6px">' + icon('message-circle') + 'Text the studio' + icon('chevron-right') + '</button>' : '') + '</div>';
     }
     var html = '';
     sections().forEach(function (sec) {
@@ -1534,7 +1541,7 @@
             '<span class="res-text"><span class="res-title">' + esc(r.title) + '</span><span class="res-sub"><span class="pill pill-coral">Needs a link</span>Hidden from the team until it has one</span></span></button></div>';
         }
         return '<div class="res-item"><a class="res-row" href="' + esc(safeUrl(r.url)) + '" target="_blank" rel="noopener">' + icon(resIcon(r)) +
-          '<span class="res-text"><span class="res-title">' + esc(r.title) + badge + '</span></span>' + (admin ? '' : icon('chevron-right')) + '</a>' + edit + '</div>';
+          '<span class="res-text"><span class="res-title">' + esc(r.title) + badge + '</span>' + (r.about ? '<span class="res-sub">' + esc(r.about) + '</span>' : '') + '</span>' + (admin ? '' : icon('chevron-right')) + '</a>' + edit + '</div>';
       }).join('') + '</div>';
     });
     return html;
@@ -1554,6 +1561,9 @@
     sheet('<h2>' + (r ? 'Edit resource' : 'Add a resource') + '</h2>' +
       '<label class="lbl" for="rf-title" style="margin-top:6px">Name</label><input class="input" id="rf-title" maxlength="80" autocomplete="off" value="' + esc(r ? r.title : '') + '">' +
       '<label class="lbl" for="rf-url">Link <span class="opt">leave empty to add later</span></label><input class="input" id="rf-url" inputmode="url" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="https://" value="' + esc(r ? r.url : '') + '">' +
+      '<label class="lbl" for="rf-about">What it\'s for <span class="opt">optional</span></label><input class="input" id="rf-about" maxlength="120" autocomplete="off" placeholder="One line the team sees under the name" value="' + esc(r ? r.about || '' : '') + '">' +
+      '<label class="lbl" for="rf-words">Search words <span class="opt">optional</span></label><input class="input" id="rf-words" maxlength="200" autocapitalize="off" autocomplete="off" placeholder="closing, lock up, end of day" value="' + esc(r ? r.words || '' : '') + '">' +
+      '<p class="fine" style="margin-top:6px">Other words people might type when looking for this. The team doesn\'t see them.</p>' +
       '<div class="lbl">Section</div><div class="chips wrap" id="rf-secs">' + secs.map(function (x) { return '<button class="chip' + (f.section === x ? ' on' : '') + '" data-rsec="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') + '</div>' +
       '<input class="input" id="rf-newsec" maxlength="40" autocomplete="off" placeholder="Or type a new section" style="margin-top:8px">' +
       '<div class="lbl">Who sees it</div><div class="seg-group" id="rf-aud">' + ['everyone', 'apprentices', 'admins'].map(function (a) { return '<button class="seg-btn' + (f.audience === a ? ' on' : '') + '" data-raud="' + a + '">' + AUD_WORDS[a] + '</button>'; }).join('') + '</div>' +
@@ -1570,7 +1580,7 @@
     if (!section) return toast('Pick a section');
     if (url && !/^https:\/\/\S+$/i.test(url)) return toast('Links need to start with https://');
     resBusy = true;
-    api('saveResource', { resource: { id: f.id, title: title, url: url, section: section, audience: f.audience, archived: !!remove } }).then(function (res) {
+    api('saveResource', { resource: { id: f.id, title: title, url: url, section: section, audience: f.audience, archived: !!remove, about: document.getElementById('rf-about').value.trim(), words: document.getElementById('rf-words').value.trim() } }).then(function (res) {
       resBusy = false;
       if (!res || !res.ok) return toast((res && res.message) || 'That didn\'t save. Try again.');
       state.resources = res.resources; saveLocalSnapshot(); closeSheet();
@@ -1586,19 +1596,66 @@
     if (d.length === 11 && d.charAt(0) === '1') d = d.slice(1);
     return d.length === 10 ? '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6) : String(p);
   }
+  function contactAdmin() { return state.me.role === 'admin' && editing(); }
   function renderContact() {
+    var admin = contactAdmin();
     var first = state.contacts.filter(function (c) { return c.primary; })[0] || state.contacts[0];
     var rest = state.contacts.filter(function (c) { return c !== first; });
-    if (!first) return '<div class="screen"><h1 class="page-title">Contact</h1><div class="empty"><div class="bubble sm">' + icon('message-circle') + '</div><div class="calm-title">No numbers yet</div></div></div>';
+    var add = admin ? '<button class="btn btn-outline" data-contact-edit="new" style="margin-top:18px">' + icon('plus') + 'Add a contact</button>' : '';
+    if (!first) return '<div class="screen"><h1 class="page-title">Contact</h1><div class="empty"><div class="bubble sm">' + icon('message-circle') + '</div><div class="calm-title">No numbers yet</div></div>' + add + '</div>';
+    var pencil = function (c) { return admin ? '<button class="res-edit" data-contact-edit="' + state.contacts.indexOf(c) + '" aria-label="Edit ' + esc(c.name) + '">' + icon('pencil') + '</button>' : ''; };
     return '<div class="screen"><h1 class="page-title">Contact</h1>' +
       '<section class="contact-main"><div class="bubble sm">' + icon('message-circle') + '</div>' +
         '<div class="contact-main-title">' + esc(first.label || 'Text the studio') + '</div><div class="contact-num">' + esc(fmtPhone(first.phone)) + '</div>' +
-        '<p class="contact-note">The fastest way to reach us. Use it for client updates, schedule questions, or anything that looks off.</p>' +
-        '<a class="btn btn-primary" href="sms:' + esc(first.phone) + '" target="_blank" rel="noopener">' + icon('message-circle') + esc(first.label || 'Text the studio') + '</a></section>' +
-      (rest.length ? '<h2 class="section-label">Or text someone directly</h2><div class="rows-list">' + rest.map(function (c) {
-        return '<div class="person-row"><span class="person-row-text"><span class="person-name">' + esc(c.name) + '</span><span class="person-sub">' + esc(fmtPhone(c.phone)) + '</span></span>' +
-          '<a class="mini-btn" href="sms:' + esc(c.phone) + '" target="_blank" rel="noopener" aria-label="' + esc(c.label || 'Text ' + c.name) + '">Text</a></div>';
-      }).join('') + '</div>' : '') + '</div>';
+        '<p class="contact-note">' + esc(first.note || 'The fastest way to reach us. Use it for client updates, schedule questions, or anything that looks off.') + '</p>' +
+        '<a class="btn btn-primary" href="sms:' + esc(first.phone) + '" target="_blank" rel="noopener">' + icon('message-circle') + esc(first.label || 'Text the studio') + '</a>' +
+        (first.call ? '<a class="btn btn-outline" href="tel:' + esc(first.phone) + '" style="margin-top:10px">' + icon('phone') + 'Call the studio</a>' : '') +
+        (admin ? '<button class="link-btn" data-contact-edit="' + state.contacts.indexOf(first) + '" style="margin-top:6px">' + icon('pencil') + 'Edit the studio line' + icon('chevron-right') + '</button>' : '') + '</section>' +
+      (rest.length ? '<h2 class="section-label">Or reach someone directly</h2><div class="rows-list">' + rest.map(function (c) {
+        return '<div class="res-item"><div class="person-row"><span class="person-row-text"><span class="person-name">' + esc(c.name) + '</span>' +
+          (c.note ? '<span class="person-sub">' + esc(c.note) + '</span>' : '') + '<span class="person-sub num">' + esc(fmtPhone(c.phone)) + '</span></span>' +
+          (c.call ? '<a class="mini-btn" href="tel:' + esc(c.phone) + '" aria-label="Call ' + esc(c.name) + '">Call</a>' : '') +
+          '<a class="mini-btn" href="sms:' + esc(c.phone) + '" target="_blank" rel="noopener" aria-label="' + esc(c.label || 'Text ' + c.name) + '">Text</a></div>' + pencil(c) + '</div>';
+      }).join('') + '</div>' : '') + add + '</div>';
+  }
+  function contactForm(which) {
+    var isNew = which === 'new', c = isNew ? { name: '', phone: '', note: '', call: false, primary: !state.contacts.length } : state.contacts[Number(which)];
+    if (!c) return;
+    state.contactForm = { index: isNew ? -1 : Number(which), call: !!c.call, primary: !!c.primary, wasPrimary: !!c.primary };
+    var f = state.contactForm;
+    sheet('<h2>' + (isNew ? 'Add a contact' : 'Edit contact') + '</h2>' +
+      '<label class="lbl" for="cf-name" style="margin-top:6px">Name</label><input class="input" id="cf-name" maxlength="40" autocomplete="off" placeholder="The studio, or a first name" value="' + esc(c.name) + '">' +
+      '<label class="lbl" for="cf-note">What to reach them about <span class="opt">optional</span></label><input class="input" id="cf-note" maxlength="90" autocomplete="off" placeholder="Sub cover and schedule changes" value="' + esc(c.note || '') + '">' +
+      '<label class="lbl" for="cf-phone">Mobile number</label><input class="input" id="cf-phone" type="tel" inputmode="tel" autocomplete="off" placeholder="(443) 555-0100" value="' + esc(c.phone ? fmtPhone(c.phone) : '') + '">' +
+      '<div class="group" style="margin-top:14px">' +
+        toggle('cfcall', f.call, 'Show a Call button', 'Leave off for a number that only takes texts.').replace('data-toggle="cfcall"', 'data-cf="call"') +
+        toggle('cfmain', f.primary, 'This is the main studio line', 'It shows at the top of Contact. There is always exactly one.').replace('data-toggle="cfmain"', 'data-cf="primary"') + '</div>' +
+      '<button class="btn btn-primary" data-sheet="savecontact" style="margin-top:14px">Save</button>' +
+      (!isNew && !c.primary ? '<div class="sheet-links"><button class="red" data-sheet="removecontact">Remove this contact</button></div>' : '') +
+      '<button class="btn btn-ghost" data-sheet="close">Cancel</button>');
+  }
+  var contactBusy = false;
+  function saveContact(remove) {
+    var f = state.contactForm; if (!f || contactBusy) return;
+    var list = state.contacts.map(function (c) { return { name: c.name, label: c.label, phone: c.phone, note: c.note || '', call: !!c.call, primary: !!c.primary }; });
+    if (remove) list.splice(f.index, 1);
+    else {
+      var name = document.getElementById('cf-name').value.replace(/\s+/g, ' ').trim(), phone = document.getElementById('cf-phone').value.replace(/[^\d+]/g, '');
+      if (!name) return toast('Add a name');
+      if (!/^\+?\d{7,15}$/.test(phone)) return toast('That number doesn\'t look right');
+      if (f.wasPrimary && !f.primary) return toast('To change the main studio line, open the other contact and switch it on there.');
+      var entry = { name: name, label: f.primary ? 'Text the studio' : 'Text ' + name, phone: phone, note: document.getElementById('cf-note').value.trim(), call: f.call, primary: f.primary };
+      if (f.primary) list.forEach(function (c) { c.primary = false; });
+      if (f.index === -1) list.push(entry); else list[f.index] = entry;
+    }
+    contactBusy = true;
+    api('saveContacts', { contacts: list }).then(function (res) {
+      contactBusy = false;
+      if (!res || !res.ok) return toast((res && res.message) || 'That didn\'t save. Try again.');
+      state.contacts = res.contacts; saveLocalSnapshot(); closeSheet();
+      if (state.view === 'tab' && state.tab === 'contact') { var y = window.scrollY; render(); window.scrollTo(0, y); }
+      toast(remove ? 'Contact removed' : 'Saved');
+    }).catch(function () { contactBusy = false; toast('That didn\'t save. Check your connection and try again.'); });
   }
 
   /* ---------- Events ---------- */
