@@ -95,9 +95,9 @@ A standard Apps Script web page failed for anyone signed in to more than one Goo
 
 Run everything with `bash tools/all.sh <output folder>` from a scratch folder laid out as `site/` (a copy of this repo's root), `tools/` (a copy of `dev/tools`), and `src/` (the server code from the private repository). Playwright with Chromium is needed. Making this run straight from the repositories is in the tracker.
 
-As of 2026-11-27, 381 checks pass.
+As of 2026-11-28, 383 checks pass.
 
-- **Browser checks, 264:** Chromium at phone width against a faked server, with the clock fixed at 2026-11-25 so dates never go stale. They cover layout, flows, wording, error states, the notification switch, and the contact editor. The phone's notification system is faked.
+- **Browser checks, 266:** Chromium at phone width against a faked server, with the clock fixed at 2026-11-25 so dates never go stale. They cover layout, flows, wording, error states, the notification switch, and the contact editor. The phone's notification system is faked.
 - **Server checks, 117:** the real `Code.js` run in Node against an in-memory Sheet, a pretend mail service, and a pretend notification service (`server_test.js`, `server_test_email.js`, `server_test_push.js`). They cover permissions, audiences, drafts, scheduling, who gets emailed or notified in each mode, and the notification signature.
 - **Live checks:** scripts named `live*.js` that hit the real deployment as the Test Person. Run by hand, and several are stale.
 
@@ -109,8 +109,8 @@ The tracker is the full list. The ones that shape how to work:
 
 - **No separate test environment.** One Sheet, one deployment. Live tests use a "Test Person" row that is hidden from counts and never emailed. Design experiments use separate pages with made-up data.
 - **No backup of the Sheet** beyond Google's own version history. Awaiting the owner's decision.
-- **The Test Person is an Admin with editing tools,** and an admin's view includes every person's link. Deactivate it before launch.
-- **The owner should issue themselves a new link** before launch, because an early one appeared in a screenshot.
+- **The Test Person is an Admin with editing tools,** and an admin's view includes every person's link. It was deactivated on 2026-11-28. The app hides it from the Team view, so it is switched on or off in the data Sheet: Team tab, the Deactivated cell in its row.
+- **The owner issued themselves a new link** on 2026-11-28, because an early one appeared in a screenshot. The old one no longer works.
 - **Editing a post overwrites its text.** After a "real change" there is no record of the wording people originally read.
 - **The Views tab logs every app open per person.** The owner has not yet decided whether that is wanted.
 - **A dead one-time endpoint (`claimTest`)** is still in the server code. It answers without a token but is locked after first use.
@@ -133,7 +133,7 @@ The tracker is the full list. The ones that shape how to work:
 4. **The sign-in expires within hours.** Expect to sign in again each working day, and check before promising the owner a quick update.
 5. If a Google link opens as the wrong account for the owner, give them the same link with `/u/2/` after the host, or the account number their last sign-in showed as `authuser`.
 6. Before changing the live project, pull it and confirm it matches the private repository. Then `clasp push --force`, then `clasp update-deployment <production id> -d "Production"`. Use clasp 3.x command names only. Afterward, post a request with a made-up token and confirm the reply is `{"ok":false,"code":"auth"}`.
-7. Live tests need the Test Person's token. Ask the owner to copy it from the Team tab and paste it in chat. Keep it outside every repository. Never use a real person's token.
+7. Live tests need the Test Person, which is deactivated. Ask the owner first. They would set its Deactivated cell back to FALSE in the Team tab of the data Sheet and copy its token from the Token cell in the same row (the app's Team view does not show the Test Person). Keep the token outside every repository. Never use a real person's token.
 8. Browser tests need the proxy bypassed for localhost and Edit mode switched on first (`localStorage vwp.edit = 1`); the scripts in `dev/tools` already do this.
 9. Commit as `Claude <noreply@anthropic.com>`. Work on the session's own branch and send changes to the owner as a pull request. Restart that branch from the latest `main` after each merge.
 

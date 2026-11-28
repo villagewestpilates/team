@@ -1201,7 +1201,7 @@
     else if (s === 'blocked') body = '<div class="card"><p>Notifications are blocked for this app on this phone. To allow them, open your phone\'s Settings, tap Notifications, then VW Team.</p></div>';
     else {
       checkPush();
-      body = '<div class="group" style="margin-top:0">' + toggle('push', push.on, 'Tell me when there\'s something new', 'A notification on this phone when a post needs your read. Email stays as the backup.').replace('data-toggle="push"', 'data-pushtoggle="1"') + '</div>';
+      body = '<div class="group" style="margin-top:0">' + toggle('push', push.on, 'Tell me when there\'s something new', push.busy === 'on' ? 'Turning on. This takes a few seconds.' : push.busy === 'off' ? 'Turning off. This takes a few seconds.' : 'A notification on this phone when a post needs your read. Email stays as the backup.').replace('data-toggle="push"', 'data-pushtoggle="1"') + '</div>';
     }
     return '<h2 class="section-label">Notifications on this phone</h2>' + body;
   }
@@ -1221,10 +1221,12 @@
     var raw = atob(k), out = new Uint8Array(raw.length); for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i); return out;
   }
   function setPush(turnOn) {
-    if (push.busy) return; push.busy = true;
+    if (push.busy) return; push.busy = turnOn ? 'on' : 'off';
     var done = function (on, msg) { push.busy = false; push.on = on; lsSet(PUSH_KEY, on ? '1' : ''); redrawSettings(); toast(msg); };
     if (turnOn) {
-      Promise.resolve(Notification.requestPermission()).then(function (perm) {
+      var asked = Notification.requestPermission();   // asked first, so it still counts as the person's own tap
+      redrawSettings();
+      Promise.resolve(asked).then(function (perm) {
         if (perm !== 'granted') { var e = new Error('perm'); e.notAllowed = true; throw e; }
         return navigator.serviceWorker.register('sw.js', { scope: './' });
       }).then(function () { return navigator.serviceWorker.ready; })
@@ -1233,6 +1235,7 @@
         .then(function () { done(true, 'Notifications are on for this phone'); })
         .catch(function (err) { done(false, err && err.notAllowed ? 'Notifications weren\'t allowed, so they\'re still off.' : 'That didn\'t work. Check your connection and try again.'); });
     } else {
+      redrawSettings();
       pushReg().then(function (reg) { return reg ? reg.pushManager.getSubscription() : null; }).then(function (sub) {
         if (!sub) return;
         return api('pushOff', { endpoint: sub.endpoint }).catch(function () {}).then(function () { return sub.unsubscribe(); });
