@@ -42,9 +42,12 @@ function fakePhone(o) {
   check('Settings has a Notifications section, after text size', (await labels(s.page)).join('|').includes('Text size on this phone|Notifications on this phone'), (await labels(s.page)).join('|'));
   check('the switch starts off', (await s.page.getAttribute('[data-pushtoggle]', 'aria-checked')) === 'false');
   await s.page.screenshot({ path: path.join(OUT, '01-notifications-off.png') });
+  await s.page.evaluate(() => { window.__saw = false; new MutationObserver(() => { if (document.getElementById('app').textContent.includes('Turning on. This takes a few seconds.')) window.__saw = true; }).observe(document.getElementById('app'), { childList: true, subtree: true, characterData: true }); });
   await s.page.click('[data-pushtoggle]');
+  check('while it is working, the switch says it is turning on', await s.page.waitForFunction(() => window.__saw, null, { timeout: 3000 }).then(() => true).catch(() => false));
   check('turning it on says so', (await toastText(s.page)) === 'Notifications are on for this phone');
   check('the switch shows on', (await s.page.getAttribute('[data-pushtoggle]', 'aria-checked')) === 'true');
+  check('the working message is gone once it is on', !(await s.page.textContent('#app')).includes('Turning on.'));
   const acts = s.sent.map(r => r.action).filter(a => a.startsWith('push'));
   check('it fetched the key, then saved this phone with the server', acts.join(',') === 'pushKey,pushOn' && s.sent.find(r => r.action === 'pushOn').endpoint === 'https://web.push.apple.com/fake-1', acts.join(','));
   check('the worker is registered for the app only, with a visible-notification subscription', await s.page.evaluate(() => window.__reg.u === 'sw.js' && window.__reg.scope === './' && window.__subOpts.visible === true && window.__subOpts.keyLen === 65));
